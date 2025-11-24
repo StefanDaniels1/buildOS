@@ -59,6 +59,13 @@ workspace/
 # Session context folders
 .context/
 
+# Observability logs and data
+.claude/data/logs/
+.claude/data/sessions/
+
+# Reference repos (not part of project)
+claude-code-hooks-multi-agent-observability/
+
 # Log files
 *.log
 
