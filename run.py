@@ -31,13 +31,26 @@ from tools.ifc_analysis_tool import (
     aggregate_classifications
 )
 
+# Import dashboard event sender
+try:
+    from send_dashboard_event import send_event
+    DASHBOARD_ENABLED = True
+except ImportError:
+    DASHBOARD_ENABLED = False
+    def send_event(*args, **kwargs):
+        pass  # No-op if dashboard not available
 
-async def run_analysis(ifc_file: str):
+
+async def run_analysis(ifc_file: str, dashboard_session_id: str = None):
     """
     Run CO2 analysis on an IFC file.
 
     This function creates a Claude session with all necessary tools
     and lets Claude orchestrate the entire workflow autonomously.
+
+    Args:
+        ifc_file: Path to the IFC file to analyze
+        dashboard_session_id: Optional session ID for dashboard events
     """
 
     # Validate input
@@ -195,8 +208,29 @@ After agent completes:
                 for block in message.content:
                     if isinstance(block, TextBlock):
                         print(block.text)
+                        # Send thinking/reasoning event
+                        if dashboard_session_id and DASHBOARD_ENABLED:
+                            send_event(
+                                "AgentThinking",
+                                session_id=dashboard_session_id,
+                                payload={
+                                    "thought": block.text[:500],  # Truncate long thoughts
+                                    "full_text": block.text
+                                }
+                            )
                     elif isinstance(block, ToolUseBlock):
                         print(f"\n  🔧 Tool: {block.name}")
+                        # Send PreToolUse event
+                        if dashboard_session_id and DASHBOARD_ENABLED:
+                            send_event(
+                                "PreToolUse",
+                                session_id=dashboard_session_id,
+                                tool_name=block.name,
+                                payload={
+                                    "tool_name": block.name,
+                                    "tool_input": block.input if hasattr(block, 'input') else {}
+                                }
+                            )
 
             elif isinstance(message, ResultMessage):
                 print("\n" + "-"*80)
@@ -204,6 +238,17 @@ After agent completes:
                     print(f"💰 Cost: ${message.total_cost_usd:.4f}")
                 if message.duration_ms:
                     print(f"⏱️  Time: {message.duration_ms/1000:.1f}s")
+
+                # Send result metrics
+                if dashboard_session_id and DASHBOARD_ENABLED:
+                    send_event(
+                        "AgentMetrics",
+                        session_id=dashboard_session_id,
+                        payload={
+                            "cost_usd": message.total_cost_usd,
+                            "duration_ms": message.duration_ms
+                        }
+                    )
 
         print("\n" + "="*80)
         print("✅ ANALYSIS COMPLETE")
@@ -295,10 +340,14 @@ async def interactive_mode():
 async def main():
     """Main entry point."""
 
+    # Check for dashboard session ID from environment
+    import os
+    dashboard_session_id = os.environ.get('DASHBOARD_SESSION_ID')
+
     if len(sys.argv) > 1:
         # File analysis mode
         ifc_file = sys.argv[1]
-        await run_analysis(ifc_file)
+        await run_analysis(ifc_file, dashboard_session_id=dashboard_session_id)
     else:
         # Interactive mode
         await interactive_mode()
