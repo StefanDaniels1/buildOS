@@ -70,13 +70,13 @@ tools/ifc_analysis_tool.py (MCP tools)
   - Example model for testing
   - Used in documentation
 
-### ❌ REMOVE - Obsolete/Unused Files
-
-#### Core Parsing Engine
+  #### Core Parsing Engine
 - **ifc_comprehensive_parser.py** - IFC parsing engine (KEEP - ESSENTIAL!)
   - Used by tools/ifc_analysis_tool.py
   - Contains ComprehensiveIfcParser class
   - Core dependency for all IFC parsing operations
+
+### ❌ REMOVE - Obsolete/Unused Files
 
 - **interactive_buildos.py** - Failed experiment (REMOVE)
   - Attempted conversation-based approach

@@ -23,7 +23,8 @@ from claude_agent_sdk import (
     ResultMessage
 )
 
-from tools.ifc_analysis_tool import (
+sys.path.insert(0, str(Path(__file__).parent / ".claude" / "tools"))
+from ifc_analysis_tool import (
     parse_ifc_file,
     get_geometric_elements,
     prepare_classification_batches,

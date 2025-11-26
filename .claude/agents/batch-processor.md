@@ -55,13 +55,24 @@ Write to: {output_filename}  # In workspace root, NOT in session context
 Format: JSON array with one object per element
 ```
 
-### Step 5: Report Results
-Tell the user:
+### Step 5: Analyze Results (RECOMMENDED)
+Instead of manually calculating statistics, use the provided analysis tool:
+
+```bash
+python $CLAUDE_PROJECT_DIR/.claude/tools/analyze_batch.py {output_filename}
+```
+
+This will automatically provide:
 - Total elements processed
-- Element type breakdown
-- Material category summary
+- Element type breakdown (with percentages)
+- Material category summary (with percentages)
 - Average confidence score
-- Output file location
+- Data completeness metrics (volume, area, materials, properties)
+
+The tool output is formatted and ready to report to the user.
+
+### Step 6: Report Results
+Share the analysis tool output with the user
 
 ## Element Classification Schema
 
