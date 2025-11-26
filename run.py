@@ -158,7 +158,7 @@ prompt: "Process batch 1 for sustainability analysis.
 - Session context: {session_context_rel}/
 - Batch file: {session_context_rel}/batches.json
 - Batch number: 1 (extract batches[0])
-- Output file: batch_1_elements.json (workspace root)
+- Output file: {session_context_rel}/batch_1_elements.json
 
 **Your task:**
 1. Read {session_context_rel}/batches.json
@@ -171,7 +171,7 @@ prompt: "Process batch 1 for sustainability analysis.
    - Quantities (volume_m3, area_m2, dimensions)
    - Properties & context (properties, spatial_context)
    - Quality assessment (confidence, data_quality, reasoning)
-5. Write output to batch_1_elements.json (workspace root)
+5. Write output to {session_context_rel}/batch_1_elements.json
 6. Verify output count matches input count
 
 **CRITICAL**: Process EVERY element. If batch has 50 elements, output must have 50.
@@ -181,9 +181,9 @@ Work efficiently. Target: 30-60 seconds for 50 elements."
 
 Wait for agent to complete.
 
-## Step 4: Verify and Report Results
+## Step 4: Verify Classification Results
 After agent completes:
-1. Read `batch_1_elements.json`
+1. Read `{session_context_rel}/batch_1_elements.json`
 2. Parse the JSON array
 3. Calculate and report:
    - Total elements classified
@@ -191,7 +191,92 @@ After agent completes:
    - Material category summary (e.g., "35 concrete, 10 steel, 5 timber")
    - Average confidence score
    - Data completeness metrics
-4. Report: "✓ Classification complete! Processed X elements. Output: batch_1_elements.json"
+4. Report: "✓ Classification complete! Processed X elements. Output: {session_context_rel}/batch_1_elements.json"
+
+## Step 5: Calculate CO2 Impact
+Report to user: "✓ Starting CO2 calculation for batch 1..."
+
+Call `Task` tool with:
+```
+subagent_type: "durability-calculator"
+model: "haiku"
+prompt: "Calculate CO2 impact for batch 1.
+
+**Input:**
+- Classified elements file: {session_context_rel}/batch_1_elements.json
+- Durability database: $CLAUDE_PROJECT_DIR/.claude/tools/durability_database.json
+
+**Output:**
+- CO2 report file: {session_context_rel}/batch_1_co2_report.json
+
+**Your task:**
+1. Read the durability database (CO2 factors, densities, reinforcement ratios)
+2. Read {session_context_rel}/batch_1_elements.json (classified elements)
+3. For EACH element with volume data:
+   - Look up material CO2 factor and density in database
+   - Calculate mass (volume × density)
+   - Calculate CO2 (mass × CO2 factor)
+   - For concrete: add reinforcement steel based on element type
+4. Aggregate statistics:
+   - Total CO2 by material category
+   - Completeness percentage
+   - List skipped elements
+5. Write complete report to {session_context_rel}/batch_1_co2_report.json
+6. Print summary report to user
+
+**CRITICAL**: Process EVERY element. Calculate completeness percentage.
+
+Work efficiently. Target: <10 seconds for 50 elements."
+```
+
+Wait for agent to complete.
+
+## Step 6: Report CO2 Calculation Results
+After CO2 calculation completes:
+1. Read `{session_context_rel}/batch_1_co2_report.json`
+2. Report summary:
+   - Total CO2 impact (kg CO2-eq)
+   - Breakdown by material category
+   - Completeness percentage
+
+## Step 7: Generate PDF Report
+Report to user: "✓ Generating professional PDF report..."
+
+Call `Task` tool with:
+```
+subagent_type: "pdf-report-generator"
+model: "haiku"
+prompt: "Generate PDF sustainability report.
+
+**Input:**
+- CO2 report: {session_context_rel}/batch_1_co2_report.json
+- IFC filename: {ifc_abs_path}
+- Output PDF: {session_context_rel}/co2_report.pdf
+
+**Your task:**
+1. Verify {session_context_rel}/batch_1_co2_report.json exists
+2. Read the CO2 data
+3. Generate PDF using: python $CLAUDE_PROJECT_DIR/.claude/tools/generate_co2_pdf.py {session_context_rel}/batch_1_co2_report.json Small_condo.ifc {session_context_rel}/co2_report.pdf
+4. Verify PDF was created
+5. Report summary with file size and page count
+
+Work efficiently. Target: <5 seconds."
+```
+
+Wait for agent to complete.
+
+## Step 8: Report Final Results
+After PDF generation completes:
+1. Report final summary:
+   - Analysis complete
+   - Session folder: {session_context_rel}/
+   - Output files:
+     * parsed_data.json (IFC data)
+     * batches.json (batch configuration)
+     * batch_1_elements.json (classified elements)
+     * batch_1_co2_report.json (CO2 calculations)
+     * co2_report.pdf (professional report)
+   - Ready for client delivery
 
 **TROUBLESHOOTING:**
 - If a tool fails, report the error and STOP (do not retry)
