@@ -1,8 +1,14 @@
+# Development Docker Compose
+# Runs frontend and backend as separate services
+
 services:
-  app:
-    build: .
+  # Backend service (API + Python orchestrator)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
     ports:
-      - "4000:4000"
+      - "${SERVER_PORT:-4000}:4000"
     volumes:
       # Persist uploads and logs
       - ./uploads:/app/uploads
@@ -11,19 +17,33 @@ services:
     environment:
       - SERVER_PORT=4000
       - NODE_ENV=production
+      - PYTHONUNBUFFERED=1
       # ANTHROPIC_API_KEY is optional - users can provide their own via the UI
-      # Set here only if you want a default/fallback key
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:4000}
     restart: unless-stopped
     networks:
-      - dokploy-network
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.buildos.rule=Host(`bimai.nl`)"
-      - "traefik.http.routers.buildos.entrypoints=websecure"
-      - "traefik.http.routers.buildos.tls.certresolver=letsencrypt"
-      - "traefik.http.services.buildos.loadbalancer.server.port=4000"
+      - buildos-network
+
+  # Frontend service (Nginx serving static files)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # These are baked into static files at build time
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
+        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:4000/stream}
+        VITE_API_PORT: ${VITE_API_PORT:-4000}
+        VITE_MAX_EVENTS: ${VITE_MAX_EVENTS:-300}
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - buildos-network
 
 networks:
-  dokploy-network:
-    external: true
+  buildos-network:
+    driver: bridge

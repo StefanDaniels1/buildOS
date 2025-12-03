@@ -1,13 +1,12 @@
 # Production Docker Compose for Dokploy/Hetzner deployment
-# This file is optimized for production use
+# Frontend and Backend as separate services with Traefik
 
 services:
-  app:
+  # Backend service (API + Python orchestrator)
+  backend:
     build:
       context: .
-      dockerfile: Dockerfile
-    ports:
-      - "${SERVER_PORT:-4000}:4000"
+      dockerfile: Dockerfile.backend
     volumes:
       # Persist data across deployments
       - uploads_data:/app/uploads
@@ -16,6 +15,7 @@ services:
     environment:
       - SERVER_PORT=4000
       - NODE_ENV=production
+      - PYTHONUNBUFFERED=1
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - DASHBOARD_URL=${DASHBOARD_URL:-https://agents.bimai.nl}
     restart: unless-stopped
@@ -25,17 +25,53 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - dokploy-network
     labels:
-      # Traefik labels for Dokploy (auto-configured)
+      # Traefik labels for API/Backend
       - "traefik.enable=true"
-      - "traefik.http.routers.buildos.rule=Host(`${DOMAIN:-agents.bimai.nl}`)"
-      - "traefik.http.routers.buildos.entrypoints=websecure"
-      - "traefik.http.routers.buildos.tls.certresolver=letsencrypt"
-      - "traefik.http.services.buildos.loadbalancer.server.port=4000"
+      # API routes
+      - "traefik.http.routers.buildos-api.rule=Host(`${DOMAIN:-agents.bimai.nl}`) && (PathPrefix(`/api`) || PathPrefix(`/events`) || PathPrefix(`/stream`))"
+      - "traefik.http.routers.buildos-api.entrypoints=websecure"
+      - "traefik.http.routers.buildos-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.buildos-api.loadbalancer.server.port=4000"
       # WebSocket support
       - "traefik.http.middlewares.buildos-ws.headers.customrequestheaders.Connection=Upgrade"
       - "traefik.http.middlewares.buildos-ws.headers.customrequestheaders.Upgrade=websocket"
-      - "traefik.http.routers.buildos.middlewares=buildos-ws"
+      - "traefik.http.routers.buildos-api.middlewares=buildos-ws"
+
+  # Frontend service (Nginx serving static files)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        # Production values - empty means relative URLs (same origin)
+        VITE_API_URL: ""
+        VITE_WS_URL: ""
+        VITE_API_PORT: "4000"
+        VITE_MAX_EVENTS: "${VITE_MAX_EVENTS:-300}"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - dokploy-network
+    labels:
+      # Traefik labels for Frontend (catch-all for remaining routes)
+      - "traefik.enable=true"
+      - "traefik.http.routers.buildos-frontend.rule=Host(`${DOMAIN:-agents.bimai.nl}`)"
+      - "traefik.http.routers.buildos-frontend.entrypoints=websecure"
+      - "traefik.http.routers.buildos-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.buildos-frontend.loadbalancer.server.port=80"
+      # Lower priority than API routes
+      - "traefik.http.routers.buildos-frontend.priority=1"
+      - "traefik.http.routers.buildos-api.priority=10"
 
 volumes:
   uploads_data:
@@ -43,6 +79,5 @@ volumes:
   workspace_data:
 
 networks:
-  default:
-    name: dokploy-network
+  dokploy-network:
     external: true
