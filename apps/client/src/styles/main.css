@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --buildos-primary: #0696D7;
+  --buildos-secondary: #5BC3E8;
+  --buildos-dark: #1a1a2e;
+  --buildos-darker: #0f0f1a;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  background: var(--buildos-darker);
+  color: #e0e0e0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--buildos-darker);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Utility classes */
+.gradient-header {
+  background: linear-gradient(135deg, var(--buildos-primary), var(--buildos-secondary));
+}
+
+.card {
+  @apply bg-buildos-dark rounded-lg border border-gray-700;
+}
+
+.btn-primary {
+  @apply bg-buildos-primary hover:bg-buildos-secondary text-white font-medium py-2 px-4 rounded-lg transition-colors;
+}
+
+.input-field {
+  @apply bg-buildos-darker border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-buildos-primary;
+}

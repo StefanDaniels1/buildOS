@@ -1,0 +1,35 @@
+# Environment
+.env
+
+# Dependencies
+node_modules/
+apps/client/node_modules/
+apps/server/node_modules/
+
+# Database
+apps/server/events.db
+apps/server/events.db-wal
+apps/server/events.db-shm
+
+# Uploads (keep .gitkeep)
+uploads/*
+!uploads/.gitkeep
+
+# Build outputs
+apps/client/dist/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Workspace
+workspace/.context/
+
+# Logs (session conversation logs contain sensitive data)
+.logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp

@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [".claude/hooks/send_event.py"]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [".claude/hooks/send_event.py"]
+      }
+    ]
+  },
+  "mcp_servers": {
+    "ifc": {
+      "description": "IFC analysis tools for buildOS",
+      "tools": ["parse_ifc_file", "prepare_batches", "calculate_co2"]
+    }
+  }
+}

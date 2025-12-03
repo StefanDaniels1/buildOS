@@ -1,0 +1,29 @@
+services:
+  app:
+    build: .
+    ports:
+      - "4000:4000"
+    volumes:
+      # Persist uploads and logs
+      - ./uploads:/app/uploads
+      - ./.logs:/app/.logs
+      - ./workspace:/app/workspace
+    environment:
+      - SERVER_PORT=4000
+      - NODE_ENV=production
+      # ANTHROPIC_API_KEY is optional - users can provide their own via the UI
+      # Set here only if you want a default/fallback key
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    restart: unless-stopped
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.buildos.rule=Host(`bimai.nl`)"
+      - "traefik.http.routers.buildos.entrypoints=websecure"
+      - "traefik.http.routers.buildos.tls.certresolver=letsencrypt"
+      - "traefik.http.services.buildos.loadbalancer.server.port=4000"
+
+networks:
+  dokploy-network:
+    external: true

@@ -1,0 +1,1070 @@
+{
+  "elements": [
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$Dv",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W310X60:W310X60:209260",
+      "object_type": "M_W-Wide Flange:W310X60:208816",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$Du",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W410X60:W410X60:209261",
+      "object_type": "M_W-Wide Flange:W410X60:208814",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$Bq",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W410X60:W410X60:209121",
+      "object_type": "M_W-Wide Flange:W410X60:208814",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$CR",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W410X60:W410X60:209166",
+      "object_type": "M_W-Wide Flange:W410X60:208814",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK_l8",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W310X60:W310X60:207325",
+      "object_type": "M_W-Wide Flange:W310X60:208816",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$Dw",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W410X60:W410X60:209263",
+      "object_type": "M_W-Wide Flange:W410X60:208814",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$Dx",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W410X60:W410X60:209262",
+      "object_type": "M_W-Wide Flange:W410X60:208814",
+      "description": null
+    },
+    {
+      "guid": "2OrWItJ6zAwBNp0OUxK$8W",
+      "ifc_type": "IfcBeam",
+      "name": "M_W-Wide Flange:W410X60:W410X60:208949",
+      "object_type": "M_W-Wide Flange:W410X60:208814",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc5T8",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187149",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc50n",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187508",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc55M",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187667",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc55U",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187675",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc55c",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187683",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc55E",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187659",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc503",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187462",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc50B",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187470",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc52o",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187639",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc55m",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187701",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc55k",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187691",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc554",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187649",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "3bXiCStxP6Fgxdej$yc50U",
+      "ifc_type": "IfcCovering",
+      "name": "Compound Ceiling:Gypsum Board:187483",
+      "object_type": "Compound Ceiling:Gypsum Board",
+      "description": null
+    },
+    {
+      "guid": "1aj$VJZFn2TxepZUBcKpac",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0762 x 2032mm:0762 x 2032mm:204034",
+      "object_type": "0762 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlSDm",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0864 x 2032mm:0864 x 2032mm:150478",
+      "object_type": "0864 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlSFK",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0864 x 2032mm:0864 x 2032mm:150378",
+      "object_type": "0864 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "1aj$VJZFn2TxepZUBcKp$i",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0762 x 2032mm:0762 x 2032mm:203720",
+      "object_type": "0762 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlS8Z",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0762 x 2032mm:0762 x 2032mm:150173",
+      "object_type": "0762 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUuXp",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0864 x 2032mm:0864 x 2032mm:159734",
+      "object_type": "0864 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlS9F",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0762 x 2032mm:0762 x 2032mm:150257",
+      "object_type": "0762 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvPL",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0864 x 2032mm:0864 x 2032mm:160208",
+      "object_type": "0864 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvVV",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0864 x 2032mm:0864 x 2032mm:159834",
+      "object_type": "0864 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvR4",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:0864 x 2032mm:0864 x 2032mm:160065",
+      "object_type": "0864 x 2032mm",
+      "description": null
+    },
+    {
+      "guid": "1s1jVhK8z0pgKYcr9jt7AB",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Glass 1:0813 x 2420mm:0813 x 2420mm:171975",
+      "object_type": "0813 x 2420mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRGQ",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:1250mm x 2010mm:1250mm x 2010mm:146596",
+      "object_type": "1250mm x 2010mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRH8",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Flush:1250mm x 2010mm:1250mm x 2010mm:146678",
+      "object_type": "1250mm x 2010mm",
+      "description": null
+    },
+    {
+      "guid": "1s1jVhK8z0pgKYcr9jt781",
+      "ifc_type": "IfcDoor",
+      "name": "M_Single-Glass 1:0813 x 2420mm:0813 x 2420mm:171853",
+      "object_type": "0813 x 2420mm",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT5l",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186604",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT2Z",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186656",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT5d",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186596",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT5t",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186612",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT2B",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186632",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT5$",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186620",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0kF45Qs8L9PAM9kmb1lT2N",
+      "ifc_type": "IfcFooting",
+      "name": "Wall Foundation:Bearing Footing - 900 x 300:186644",
+      "object_type": "Wall Foundation:Bearing Footing - 900 x 300",
+      "description": null
+    },
+    {
+      "guid": "0jf0rYHfX3RAB3bSIRjmxl",
+      "ifc_type": "IfcRoof",
+      "name": "Basic Roof:Live Roof over Wood Joist Flat Roof:184483",
+      "object_type": "Basic Roof:Live Roof over Wood Joist Flat Roof",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRrM",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Residential - Wood Joist with Subflooring:144872",
+      "object_type": "Floor:Residential - Wood Joist with Subflooring",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRqU",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Residential - Wood Joist with Subflooring:144800",
+      "object_type": "Floor:Residential - Wood Joist with Subflooring",
+      "description": null
+    },
+    {
+      "guid": "2O2Fr$t4X7Zf8NOew3FK4F",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:127mm Slab on Grade:141232",
+      "object_type": "Floor:127mm Slab on Grade",
+      "description": null
+    },
+    {
+      "guid": "2O2Fr$t4X7Zf8NOew3FKcz",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:127mm Slab on Grade:143106",
+      "object_type": "Floor:127mm Slab on Grade",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtxr",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:170352",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtgP",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:171292",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUt0F",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Ceramic Tile:169866",
+      "object_type": "Floor:Finish Floor - Ceramic Tile",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUt2f",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Ceramic Tile:169772",
+      "object_type": "Floor:Finish Floor - Ceramic Tile",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtDX",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:169188",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtBP",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:169308",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtjR",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Ceramic Tile:171230",
+      "object_type": "Floor:Finish Floor - Ceramic Tile",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUt8F",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:169354",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtju",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Ceramic Tile:171261",
+      "object_type": "Floor:Finish Floor - Ceramic Tile",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUt5W",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:169701",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtoa",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Ceramic Tile:170785",
+      "object_type": "Floor:Finish Floor - Ceramic Tile",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtC0",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:169093",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUt8s",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Wood:169395",
+      "object_type": "Floor:Finish Floor - Wood",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUten",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:Finish Floor - Ceramic Tile:171444",
+      "object_type": "Floor:Finish Floor - Ceramic Tile",
+      "description": null
+    },
+    {
+      "guid": "1CZILmCaHETO8tf3SgGEXu",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:150mm Exterior Slab on Grade:216552",
+      "object_type": "Floor:150mm Exterior Slab on Grade",
+      "description": null
+    },
+    {
+      "guid": "1CZILmCaHETO8tf3SgGEWh",
+      "ifc_type": "IfcSlab",
+      "name": "Floor:150mm Exterior Slab on Grade:216507",
+      "object_type": "Floor:150mm Exterior Slab on Grade",
+      "description": null
+    },
+    {
+      "guid": "3ThA22djr8AQQ9eQMA5s7I",
+      "ifc_type": "IfcSlab",
+      "name": "Basic Roof:Live Roof over Wood Joist Flat Roof:184483",
+      "object_type": "Basic Roof:Live Roof over Wood Joist Flat Roof",
+      "description": null
+    },
+    {
+      "guid": "21ldoMpbP4VfsJ0XGY_34d",
+      "ifc_type": "IfcStair",
+      "name": "Stair:Residential - 200mm Max Riser 250mm Tread:198878",
+      "object_type": "Stair:Residential - 200mm Max Riser 250mm Tread",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4v_O1",
+      "ifc_type": "IfcStair",
+      "name": "Stair:Residential - 200mm Max Riser 250mm Tread:151086",
+      "object_type": "Stair:Residential - 200mm Max Riser 250mm Tread",
+      "description": null
+    },
+    {
+      "guid": "2O2Fr$t4X7Zf8NOew3FKau",
+      "ifc_type": "IfcWall",
+      "name": "Basic Wall:Party Wall - CMU Residential Unit Dimising Wall:143239",
+      "object_type": "Basic Wall:Party Wall - CMU Residential Unit Dimising Wall:128555",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4pU",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:2800mm x 2410mm:2800mm x 2410mm:181096",
+      "object_type": "2800mm x 2410mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4$e",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:2800mm x 2410mm:2800mm x 2410mm:180318",
+      "object_type": "2800mm x 2410mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlS2V",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:149537",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlSga",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:147994",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRRL",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:750mm x 2200mm:750mm x 2200mm:147051",
+      "object_type": "750mm x 2200mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRLx",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:750mm x 2200mm:750mm x 2200mm:146885",
+      "object_type": "750mm x 2200mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlR72",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:4835mm x 2420mm:4835mm x 2420mm:145788",
+      "object_type": "4835mm x 2420mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4ZZ",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:750mm x 2200mm:750mm x 2200mm:182101",
+      "object_type": "750mm x 2200mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4aS",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:750mm x 2200mm:750mm x 2200mm:181930",
+      "object_type": "750mm x 2200mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4hv",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:181583",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlSXO",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:2800mm x 2410mm:2800mm x 2410mm:147686",
+      "object_type": "2800mm x 2410mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlS_W",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:2800mm x 2410mm:2800mm x 2410mm:149278",
+      "object_type": "2800mm x 2410mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlRBU",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:4835mm x 2420mm:4835mm x 2420mm:146016",
+      "object_type": "4835mm x 2420mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4qs",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:180864",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1Eo2$BaHX42AEkDvQQDocD",
+      "ifc_type": "IfcWindow",
+      "name": "M_Skylight:1180 x 1170mm:1180 x 1170mm:185337",
+      "object_type": "1180 x 1170mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4kJ",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:181285",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1Eo2$BaHX42AEkDvQQDoy2",
+      "ifc_type": "IfcWindow",
+      "name": "M_Skylight:1180 x 1170mm:1180 x 1170mm:185718",
+      "object_type": "1180 x 1170mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlSp1",
+      "ifc_type": "IfcWindow",
+      "name": "M_Casement:819mm x 759mm:819mm x 759mm:148607",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4oq",
+      "ifc_type": "IfcWindow",
+      "name": "M_Casement:819mm x 759mm:819mm x 759mm:180994",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4gQ",
+      "ifc_type": "IfcWindow",
+      "name": "M_Casement:819mm x 759mm:819mm x 759mm:181548",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1l0GAJtRTFv8$zmKJOH4u1",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:180663",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlS4Q",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:149924",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlSnC",
+      "ifc_type": "IfcWindow",
+      "name": "M_Fixed:819mm x 759mm:819mm x 759mm:148722",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "1hOSvn6df7F8_7GcBWlS1M",
+      "ifc_type": "IfcWindow",
+      "name": "M_Casement:819mm x 759mm:819mm x 759mm:149736",
+      "object_type": "819mm x 759mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqx",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Counter Top:600mm Depth:600mm Depth:162494",
+      "object_type": "600mm Depth",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUv3h",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Counter Top:600mm Depth:600mm Depth:161646",
+      "object_type": "600mm Depth",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvq_",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Counter Top:600mm Depth:600mm Depth:162491",
+      "object_type": "600mm Depth",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUv88",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Counter Top w Sink Hole:600mm Depth:600mm Depth:161165",
+      "object_type": "600mm Depth",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvuo",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Counter Top:600mm Depth:600mm Depth:162231",
+      "object_type": "600mm Depth",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvq$",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Counter Top w Sink Hole:600mm Depth:600mm Depth:162490",
+      "object_type": "600mm Depth",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy3G",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:157951",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy_8",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:157607",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vyu$",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:157200",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy4F",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:157984",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy4m",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:157983",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy3H",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:157950",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy6k",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:158081",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vy6l",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Tall Cabinet-Single Door(2):800 mm:800 mm:158080",
+      "object_type": "800 mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vyOn",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:159262",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvH8",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:160717",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqp",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162486",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvr4",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162497",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4j7w",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000 mm:1000 mm:191401",
+      "object_type": "1000 mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvtA",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162383",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqu",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162493",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvsm",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162357",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqy",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162489",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2gRXFgjRn2HPE$YoDLX0mp",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Vanity Cabinet-Double Door Sink Unit:650 x 450 mm:650 x 450 mm:204934",
+      "object_type": "650 x 450 mm",
+      "description": null
+    },
+    {
+      "guid": "2gRXFgjRn2HPE$YoDLX0ra",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Vanity Cabinet-Double Door Sink Unit:650 x 450 mm:650 x 450 mm:205265",
+      "object_type": "650 x 450 mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvGQ",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:160671",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqz",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162488",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "0wkEuT1wr1kOyafLY4vyMO",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:159159",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvup",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162230",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqw",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162495",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvqo",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162487",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvs2",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162311",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "2gRXFgjRn2HPE$YoDLX0q2",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Vanity Cabinet-Double Door Sink Unit:650 x 450 mm:650 x 450 mm:205239",
+      "object_type": "650 x 450 mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4jOM",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000 mm:1000 mm:191557",
+      "object_type": "1000 mm",
+      "description": null
+    },
+    {
+      "guid": "2gRXFgjRn2HPE$YoDLX0vP",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Vanity Cabinet-Double Door Sink Unit:450 x 450 mm:450 x 450 mm:205548",
+      "object_type": "450 x 450 mm",
+      "description": null
+    },
+    {
+      "guid": "2gRXFgjRn2HPE$YoDLX0rb",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Vanity Cabinet-Double Door Sink Unit:650 x 450 mm:650 x 450 mm:205264",
+      "object_type": "650 x 450 mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUvr5",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Base Cabinet-Double Door & 2 Drawer:1000mm:1000mm:162496",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4jKO",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000 mm:1000 mm:192331",
+      "object_type": "1000 mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4jMl",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000 mm:1000 mm:192508",
+      "object_type": "1000 mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4jJA",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000 mm:1000 mm:192153",
+      "object_type": "1000 mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4jTB",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000mm:1000mm:191768",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4ien",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000mm:1000mm:192610",
+      "object_type": "1000mm",
+      "description": null
+    },
+    {
+      "guid": "0iEHWY1$XA8eQeeULq4jQJ",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Upper Cabinet-Double Door-Wall:1000 mm:1000 mm:191680",
+      "object_type": "1000 mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUshs",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Sofa:1830mm:1830mm:167283",
+      "object_type": "1830mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUsc7",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Sofa:1830mm:1830mm:167426",
+      "object_type": "1830mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtOu",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0915 x 1830 x 0457mm:0915 x 1830 x 0457mm:168381",
+      "object_type": "0915 x 1830 x 0457mm",
+      "description": null
+    },
+    {
+      "guid": "2kvhekJrnDjRw0CDkKW$fQ",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:206876",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtM4",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Bed-Standard:1525 x 2007mm - Queen:1525 x 2007mm - Queen:168449",
+      "object_type": "1525 x 2007mm - Queen",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtEr",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Bed-Standard:1525 x 2007mm - Queen:1525 x 2007mm - Queen:169008",
+      "object_type": "1525 x 2007mm - Queen",
+      "description": null
+    },
+    {
+      "guid": "2kvhekJrnDjRw0CDkKW$KL",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:206675",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUsab",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:167584",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2kvhekJrnDjRw0CDkKW$JW",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:206502",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUsbY",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:167655",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtHN",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Bed-Standard:1981 x 2032mm - King:1981 x 2032mm - King:168914",
+      "object_type": "1981 x 2032mm - King",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtO_",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:168379",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtVQ",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0915 x 1830 x 0457mm:0915 x 1830 x 0457mm:168031",
+      "object_type": "0915 x 1830 x 0457mm",
+      "description": null
+    },
+    {
+      "guid": "2kvhekJrnDjRw0CDkKW$UD",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:206283",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtI8",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Bed-Standard:1981 x 2032mm - King:1981 x 2032mm - King:168717",
+      "object_type": "1981 x 2032mm - King",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtOy",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Sofa:1830mm:1830mm:168377",
+      "object_type": "1830mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtOv",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Table-Coffee:0610 x 0610 x 0610mm:0610 x 0610 x 0610mm:168380",
+      "object_type": "0610 x 0610 x 0610mm",
+      "description": null
+    },
+    {
+      "guid": "2OBrcmyk58NupXoVOHUtO$",
+      "ifc_type": "IfcFurnishingElement",
+      "name": "M_Sofa:1830mm:1830mm:168378",
+      "object_type": "1830mm",
+      "description": null
+    }
+  ],
+  "total_count": 152,
+  "source_file": "/Users/stefandaniels/Documents/BIMAI/BIMAI_V3/agent_system4/agent_system5/Small_condo.ifc"
+}

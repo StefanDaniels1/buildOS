@@ -1,0 +1,48 @@
+# Production Docker Compose for Dokploy/Hetzner deployment
+# This file is optimized for production use
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${SERVER_PORT:-4000}:4000"
+    volumes:
+      # Persist data across deployments
+      - uploads_data:/app/uploads
+      - logs_data:/app/.logs
+      - workspace_data:/app/workspace
+    environment:
+      - SERVER_PORT=4000
+      - NODE_ENV=production
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - DASHBOARD_URL=${DASHBOARD_URL:-https://agents.bimai.nl}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/events/recent?limit=1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      # Traefik labels for Dokploy (auto-configured)
+      - "traefik.enable=true"
+      - "traefik.http.routers.buildos.rule=Host(`${DOMAIN:-agents.bimai.nl}`)"
+      - "traefik.http.routers.buildos.entrypoints=websecure"
+      - "traefik.http.routers.buildos.tls.certresolver=letsencrypt"
+      - "traefik.http.services.buildos.loadbalancer.server.port=4000"
+      # WebSocket support
+      - "traefik.http.middlewares.buildos-ws.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.middlewares.buildos-ws.headers.customrequestheaders.Upgrade=websocket"
+      - "traefik.http.routers.buildos.middlewares=buildos-ws"
+
+volumes:
+  uploads_data:
+  logs_data:
+  workspace_data:
+
+networks:
+  default:
+    name: dokploy-network
+    external: true

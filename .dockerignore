@@ -1,0 +1,42 @@
+# Docker
+.docker/
+
+# Node
+node_modules/
+apps/client/node_modules/
+apps/server/node_modules/
+
+# Build outputs
+apps/client/dist/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Logs (keep structure)
+.logs/conversations/*.jsonl
+
+# Uploads (keep structure)  
+uploads/*.ifc
+uploads/*.csv
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.log
+*.tmp

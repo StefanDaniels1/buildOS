@@ -1,0 +1,48 @@
+# Dokploy Configuration
+# This file configures the deployment on Dokploy
+
+# Application settings
+name: buildos-dashboard
+description: buildOS Agent Dashboard - AI-powered IFC file analysis
+
+# Build configuration
+build:
+  type: dockerfile
+  dockerfile: Dockerfile
+  context: .
+
+# Resource limits (adjust based on your Hetzner plan)
+resources:
+  memory: 2048M
+  cpu: 1.0
+
+# Environment variables (set these in Dokploy UI or use secrets)
+# ANTHROPIC_API_KEY - Required for AI orchestrator
+# DOMAIN - Your domain (e.g., agents.bimai.nl)
+
+# Domains
+domains:
+  - host: agents.bimai.nl
+    https: true
+    certificate: letsencrypt
+
+# Health check
+healthCheck:
+  path: /events/recent?limit=1
+  interval: 30
+  timeout: 10
+  retries: 3
+
+# Persistent volumes
+volumes:
+  - name: uploads
+    path: /app/uploads
+  - name: logs
+    path: /app/.logs
+  - name: workspace
+    path: /app/workspace
+
+# Ports
+ports:
+  - containerPort: 4000
+    protocol: tcp

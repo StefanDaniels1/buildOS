@@ -1,0 +1,58 @@
+{
+  "description": "CO2 factors lookup table for buildOS classification types",
+  "version": "1.0.0",
+  "source": "NIBE database - computed from material specs",
+  "units": "kg CO2-eq per m³",
+  "Concrete_Structural": {
+    "co2_per_m3": 276.0,
+    "notes": "C25/30 concrete at 0.115 kg/kg × 2400 kg/m³"
+  },
+  "Concrete_Foundation": {
+    "co2_per_m3": 264.0,
+    "notes": "C20/25 concrete at 0.110 kg/kg × 2400 kg/m³"
+  },
+  "Concrete_Floor": {
+    "co2_per_m3": 276.0,
+    "notes": "C25/30 concrete at 0.115 kg/kg × 2400 kg/m³"
+  },
+  "Concrete_Facade": {
+    "co2_per_m3": 276.0,
+    "notes": "C25/30 concrete at 0.115 kg/kg × 2400 kg/m³"
+  },
+  "Steel_Structural": {
+    "co2_per_m3": 14522.5,
+    "notes": "Structural steel at 1.85 kg/kg × 7850 kg/m³"
+  },
+  "Steel_Reinforcement": {
+    "co2_per_m3": 12952.5,
+    "notes": "Rebar at 1.65 kg/kg × 7850 kg/m³"
+  },
+  "Timber_Softwood": {
+    "co2_per_m3": -475.0,
+    "notes": "Softwood at -0.95 kg/kg × 500 kg/m³ (carbon sink)"
+  },
+  "Timber_Engineered": {
+    "co2_per_m3": -357.5,
+    "notes": "CLT/Glulam at -0.65 kg/kg × 550 kg/m³ (carbon sink)"
+  },
+  "Masonry_Clay_Brick": {
+    "co2_per_m3": 396.0,
+    "notes": "Clay bricks at 0.220 kg/kg × 1800 kg/m³"
+  },
+  "Masonry_Calcium_Silicate": {
+    "co2_per_m3": 256.5,
+    "notes": "Kalkzandsteen at 0.135 kg/kg × 1900 kg/m³"
+  },
+  "Insulation_Mineral_Wool": {
+    "co2_per_m3": 54.0,
+    "notes": "Mineral wool at 1.35 kg/kg × 40 kg/m³"
+  },
+  "Glass": {
+    "co2_per_m3": 2125.0,
+    "notes": "Float glass at 0.850 kg/kg × 2500 kg/m³"
+  },
+  "Unknown": {
+    "co2_per_m3": 0.0,
+    "notes": "Fallback for unclassified elements"
+  }
+}
