@@ -62,16 +62,6 @@ services:
       start_period: 10s
     networks:
       - dokploy-network
-    labels:
-      # Traefik labels for Frontend (catch-all for remaining routes)
-      - "traefik.enable=true"
-      - "traefik.http.routers.buildos-frontend.rule=Host(`${DOMAIN:-agents.bimai.nl}`)"
-      - "traefik.http.routers.buildos-frontend.entrypoints=websecure"
-      - "traefik.http.routers.buildos-frontend.tls.certresolver=letsencrypt"
-      - "traefik.http.services.buildos-frontend.loadbalancer.server.port=80"
-      # Lower priority than API routes
-      - "traefik.http.routers.buildos-frontend.priority=1"
-      - "traefik.http.routers.buildos-api.priority=10"
 
 volumes:
   uploads_data:
