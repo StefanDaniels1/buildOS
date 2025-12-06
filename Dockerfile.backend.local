@@ -16,10 +16,11 @@ FROM python:3.12-slim
 # Required: Claude SDK refuses bypassPermissions mode when running as root
 RUN useradd -m -s /bin/bash -u 1000 buildos
 
-# Install system dependencies and bun (as root, before switching user)
+# Install system dependencies (as root, before switching user)
 RUN apt-get update && apt-get install -y \
     curl \
     unzip \
+    gosu \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -54,8 +55,9 @@ RUN mkdir -p uploads workspace .logs/conversations
 # Change ownership of entire app to buildos user
 RUN chown -R buildos:buildos /app
 
-# Switch to non-root user for runtime
-USER buildos
+# Copy entrypoint script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # Environment variables (defaults)
 ENV SERVER_PORT=4000
@@ -70,6 +72,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Expose port
 EXPOSE 4000
 
-# Start server
+# Start server via entrypoint (runs as root, fixes permissions, then switches to buildos)
 WORKDIR /app/apps/server
-CMD ["bun", "run", "src/index.ts"]
+ENTRYPOINT ["docker-entrypoint.sh"]
