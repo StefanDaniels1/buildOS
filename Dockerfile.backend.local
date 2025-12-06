@@ -1,4 +1,4 @@
-# Backend Dockerfile for buildOS Dashboard
+# Backend Dockerfile for LOCAL development
 # Includes Python orchestrator + Bun server
 # Runs as non-root user (required for Claude SDK bypassPermissions mode)
 
@@ -16,7 +16,7 @@ FROM python:3.12-slim
 # Required: Claude SDK refuses bypassPermissions mode when running as root
 RUN useradd -m -s /bin/bash -u 1000 buildos
 
-# Install system dependencies (as root, before switching user)
+# Install system dependencies and bun (as root, before switching user)
 RUN apt-get update && apt-get install -y \
     curl \
     unzip \
