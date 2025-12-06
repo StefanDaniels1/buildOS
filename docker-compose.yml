@@ -1,5 +1,14 @@
 # Development Docker Compose
 # Runs frontend and backend as separate services
+#
+# Usage:
+#   docker-compose up --build
+#
+# Access:
+#   Frontend: http://localhost:3000
+#   Backend API: http://localhost:4000
+#
+# The frontend proxies API requests to the backend via nginx
 
 services:
   # Backend service (API + Python orchestrator)
@@ -20,26 +29,33 @@ services:
       - PYTHONUNBUFFERED=1
       # ANTHROPIC_API_KEY is optional - users can provide their own via the UI
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - DASHBOARD_URL=${DASHBOARD_URL:-http://localhost:4000}
+      - DASHBOARD_URL=${DASHBOARD_URL:-http://backend:4000}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:4000/events/recent?limit=1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
     networks:
       - buildos-network
 
-  # Frontend service (Nginx serving static files)
+  # Frontend service (Nginx serving static files + reverse proxy)
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile.frontend.local
       args:
-        # These are baked into static files at build time
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:4000}
-        VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:4000/stream}
-        VITE_API_PORT: ${VITE_API_PORT:-4000}
+        # Empty = use relative URLs, nginx proxies to backend
+        VITE_API_URL: ""
+        VITE_WS_URL: ""
+        VITE_API_PORT: "4000"
         VITE_MAX_EVENTS: ${VITE_MAX_EVENTS:-300}
     ports:
-      - "${FRONTEND_PORT:-5173}:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - buildos-network
