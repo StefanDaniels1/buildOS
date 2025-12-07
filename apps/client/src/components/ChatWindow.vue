@@ -2,6 +2,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import type { HookEvent } from '../types';
 import { API_BASE_URL } from '../config';
+import MarkdownRenderer from './MarkdownRenderer.vue';
 
 const props = defineProps<{
   events: HookEvent[];
@@ -300,9 +301,9 @@ watch(() => props.initialMessage, async (val) => {
 
         <!-- Final answer -->
         <div v-else-if="event.hook_event_type === 'Stop' && event.payload.status === 'success'" class="flex">
-          <div class="bg-green-900/50 text-green-300 rounded-lg px-3 py-2 max-w-[80%]">
-            <span class="text-xs text-green-500 block mb-1">✅ Complete</span>
-            {{ event.payload.message }}
+          <div class="bg-green-900/50 text-green-300 rounded-lg px-4 py-3 max-w-[90%] w-full">
+            <span class="text-xs text-green-500 block mb-2">✅ Complete</span>
+            <MarkdownRenderer :content="String(event.payload.message)" />
           </div>
         </div>
 

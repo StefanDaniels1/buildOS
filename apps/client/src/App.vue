@@ -7,6 +7,7 @@ import ChatWindow from './components/ChatWindow.vue';
 import EventTimeline from './components/EventTimeline.vue';
 import SessionFilter from './components/SessionFilter.vue';
 import IfcViewer from './components/IfcViewer.vue';
+import MarkdownRenderer from './components/MarkdownRenderer.vue';
 import { API_BASE_URL } from './config';
 
 const { events, isConnected, error } = useWebSocket();
@@ -121,6 +122,44 @@ function handleFileUploaded(file: {name: string, path: string, absolutePath: str
   // Add to uploaded files array so it's available to orchestrator
   uploadedFiles.value.push(file);
   console.log('✅ App.vue: File added via ChatWindow:', file, 'Total files:', uploadedFiles.value.length);
+}
+
+// Extract PDF path from message content
+function extractPdfPath(message: string): string | null {
+  // Look for PDF file paths in various formats
+  const patterns = [
+    /([^\s]+\.pdf)/gi,                          // Simple .pdf path
+    /["']([^"']+\.pdf)["']/gi,                  // Quoted PDF path
+    /(?:generated|created|saved).*?([^\s]+\.pdf)/gi,  // Generated PDF
+  ];
+  
+  for (const pattern of patterns) {
+    const match = pattern.exec(message);
+    if (match) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+// Get download URL for a file
+function getDownloadUrl(filePath: string): string {
+  // If it's already a full URL, return as-is
+  if (filePath.startsWith('http')) {
+    return filePath;
+  }
+  // Handle workspace paths
+  if (filePath.includes('/workspace/')) {
+    const relativePath = filePath.split('/workspace/')[1];
+    return `${API_BASE_URL}/workspace/${relativePath}`;
+  }
+  // Handle uploads paths
+  if (filePath.includes('/uploads/')) {
+    const relativePath = filePath.split('/uploads/')[1];
+    return `${API_BASE_URL}/uploads/${relativePath}`;
+  }
+  // Default: assume it's relative to workspace
+  return `${API_BASE_URL}/workspace/${filePath}`;
 }
 
 function createNewSession() {
@@ -418,9 +457,23 @@ function toggleRight() {
 
               <!-- Final answer -->
               <div v-else-if="event.hook_event_type === 'Stop' && event.payload.status === 'success'" class="flex">
-                <div class="bg-green-900/50 text-green-300 rounded-lg px-3 py-2 max-w-[80%]">
-                  <span class="text-xs text-green-500 block mb-1">✅ Complete</span>
-                  {{ event.payload.message }}
+                <div class="bg-green-900/50 text-green-300 rounded-lg px-4 py-3 max-w-[90%] w-full">
+                  <span class="text-xs text-green-500 block mb-2">✅ Complete</span>
+                  <MarkdownRenderer :content="String(event.payload.message)" />
+                  <!-- PDF Download Button -->
+                  <div v-if="extractPdfPath(String(event.payload.message))" class="mt-4 pt-3 border-t border-green-700/50">
+                    <a
+                      :href="getDownloadUrl(extractPdfPath(String(event.payload.message)) || '')"
+                      target="_blank"
+                      download
+                      class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Download PDF Report
+                    </a>
+                  </div>
                 </div>
               </div>
 
