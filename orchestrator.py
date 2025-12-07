@@ -51,6 +51,63 @@ async def send_event(event_type: str, payload: dict, session_id: str, dashboard_
         print(f"Failed to send event: {e}", file=sys.stderr)
 
 
+def _get_tool_description(tool_name: str, tool_input: dict) -> str:
+    """Extract meaningful description from tool input for dashboard display."""
+
+    # Bash tool - use description field or command summary
+    if tool_name == "Bash":
+        if tool_input.get("description"):
+            return tool_input["description"]
+        command = tool_input.get("command", "")
+        # Truncate long commands
+        if len(command) > 80:
+            command = command[:77] + "..."
+        return f"Running: {command}"
+
+    # Read tool - show file path
+    if tool_name == "Read":
+        file_path = tool_input.get("file_path", "")
+        # Show just filename for cleaner display
+        filename = Path(file_path).name if file_path else "file"
+        return f"Reading: {filename}"
+
+    # Write tool - show file path
+    if tool_name == "Write":
+        file_path = tool_input.get("file_path", "")
+        filename = Path(file_path).name if file_path else "file"
+        return f"Writing: {filename}"
+
+    # Edit tool - show file and action
+    if tool_name == "Edit":
+        file_path = tool_input.get("file_path", "")
+        filename = Path(file_path).name if file_path else "file"
+        return f"Editing: {filename}"
+
+    # Glob tool - show pattern
+    if tool_name == "Glob":
+        pattern = tool_input.get("pattern", "")
+        return f"Searching files: {pattern}"
+
+    # Grep tool - show pattern
+    if tool_name == "Grep":
+        pattern = tool_input.get("pattern", "")
+        return f"Searching content: {pattern}"
+
+    # MCP IFC tools - extract meaningful info
+    if tool_name.startswith("mcp__ifc__"):
+        action = tool_name.replace("mcp__ifc__", "").replace("_", " ").title()
+        if "ifc_path" in tool_input:
+            filename = Path(tool_input["ifc_path"]).name
+            return f"{action}: {filename}"
+        if "json_path" in tool_input:
+            filename = Path(tool_input["json_path"]).name
+            return f"{action}: {filename}"
+        return action
+
+    # Default - just show tool name
+    return f"Using tool: {tool_name}"
+
+
 async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboard_url: str, logger: ConversationLogger):
     """
     Stream SDK events to dashboard in real-time AND log to conversation logger.
@@ -104,9 +161,12 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                             "timestamp": datetime.now().isoformat()
                         }, session_id, dashboard_url)
                     else:
-                        # Other tool use
+                        # Other tool use - extract meaningful description
+                        tool_input = block.input or {}
+                        thought = _get_tool_description(block.name, tool_input)
+
                         await send_event("AgentThinking", {
-                            "thought": f"Using tool: {block.name}",
+                            "thought": thought,
                             "timestamp": datetime.now().isoformat()
                         }, session_id, dashboard_url)
 
@@ -114,7 +174,7 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                     # Tool result - LOG FULL OUTPUT
                     tool_result = block.content if hasattr(block, 'content') else str(block)
                     is_error = block.is_error if hasattr(block, 'is_error') else False
-                    
+
                     logger.log_tool_result(
                         tool_name="unknown",  # SDK doesn't provide tool name in result
                         tool_output=tool_result,
@@ -122,12 +182,15 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                         error=tool_result if is_error else None,
                         agent_id="orchestrator"
                     )
-                    
-                    # Send to dashboard
-                    await send_event("AgentThinking", {
-                        "thought": "Tool execution completed",
-                        "timestamp": datetime.now().isoformat()
-                    }, session_id, dashboard_url)
+
+                    # Only send error results to dashboard (success is implicit)
+                    if is_error:
+                        # Truncate long error messages
+                        error_msg = str(tool_result)[:200] if len(str(tool_result)) > 200 else str(tool_result)
+                        await send_event("AgentThinking", {
+                            "thought": f"Error: {error_msg}",
+                            "timestamp": datetime.now().isoformat()
+                        }, session_id, dashboard_url)
 
         elif isinstance(message, ResultMessage):
             # Log model metrics
@@ -263,74 +326,54 @@ async def run_orchestrator(
     try:
         # SDK IS the orchestrator - it coordinates everything
         async with ClaudeSDKClient(options=options) as client:
-            # Build orchestrator prompt
-            orchestrator_prompt = f"""You are the buildOS orchestrator coordinating specialized agents.
+            # Build orchestrator prompt - delegates to skill for workflow
+            skill_path = "$CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/SKILL.md"
+
+            orchestrator_prompt = f"""You are the buildOS orchestrator for building sustainability analysis.
 
 **User Request**: "{message}"
 **IFC File**: {file_path if file_path else "No file provided"}
 **Available Files**: {', '.join(available_files) if available_files else "None"}
-**Session Context Folder**: {session_context}/
+**Session Context**: {session_context}/
 **Session ID**: {session_id}
 
-Your job is to:
-1. Classify the user's intent
-2. Coordinate specialized agents to fulfill the request
-3. Validate agent completeness
-4. Report results to the user
+## Skill-Based Workflow
 
-## Intent Classification
+For IFC analysis and CO2 calculations, read the skill file:
+**Skill Guide**: {skill_path}
 
-Classify into one of:
+The skill file contains:
+- Complete workflow steps (Parse → Classify → Calculate → Report)
+- When to use MCP tools vs CLI scripts
+- How to spawn batch-processor agents for parallel classification
+- Output format specifications
 
-### Simple Query
-Pattern: "How many [element type]?" or "List [element type]"
-Action: Spawn single explore agent for quick answer
+## Quick Reference (from skill)
 
-### Exploratory
-Pattern: "What's in the model?" or "Analyze structure"
-Action: Spawn explore agent with comprehensive summary
+| Step | Tool/Script | Purpose |
+|------|-------------|---------|
+| Parse IFC | `mcp__ifc__parse_ifc_file` | Extract building elements |
+| Prepare Batches | `mcp__ifc__prepare_batches` | Split for parallel processing |
+| Classify | Task agents (batch-processor) | Material classification |
+| Calculate CO2 | `mcp__ifc__calculate_co2` | CO2 impact calculation |
+| Generate PDF | `python scripts/generate_pdf.py` | Create report |
 
-### Full CO2 Analysis
-Pattern: "Calculate CO2" or "Environmental impact" or "Sustainability report"
-Action: Run 4-phase workflow:
-1. data-prep: Parse IFC file → create batches
-2. batch-processor × N: Classify elements (parallel)
-3. durability-calculator × N: Calculate CO2 (parallel)
-4. pdf-report-generator: Create final PDF report
+## Session Context
 
-## Agent Coordination
+All intermediate files go in: {session_context}/
+- parsed_data.json
+- batches.json
+- batch_N_elements.json (per batch)
+- co2_report.json
+- co2_report.pdf
 
-Use the Task tool to spawn agents:
-```
-Task(
-    subagent_type="data-prep",
-    description="Parse Small_condo.ifc and create classification batches",
-    model="haiku"
-)
-```
+## Important Paths
 
-Available agents: data-prep, batch-processor, durability-calculator, pdf-report-generator
+- Skill scripts: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/scripts/
+- Reference data: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/
+- Database: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/durability_database.json
 
-## Validation Loop
-
-After each agent completes:
-1. Review output files in {session_context}/
-2. Check completeness:
-   - data-prep: batches.json exists with all elements?
-   - batch-processor: ALL elements classified?
-   - calculator: ALL elements have CO2 values?
-3. If incomplete: Re-spawn agent with specific feedback (max 2 retries)
-4. If complete: Proceed to next phase
-
-## IFC Tools Available
-
-You have access to these MCP tools:
-- mcp__ifc__parse_ifc_file(ifc_path, output_path) - Parse IFC to JSON
-- mcp__ifc__prepare_batches(json_path, batch_size, output_path) - Create batches
-- mcp__ifc__calculate_co2(classified_path, database_path, output_path) - Calculate CO2
-  * database_path should be: .claude/tools/co2_factors.json
-
-Coordinate agents efficiently and report results clearly.
+Read the skill file for detailed guidance. Coordinate agents efficiently.
 """
 
             # Log the orchestrator prompt - FULL VISIBILITY

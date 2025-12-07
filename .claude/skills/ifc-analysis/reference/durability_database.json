@@ -1,0 +1,170 @@
+{
+  "description": "Simplified durability database for buildOS CO2 calculations",
+  "source": "NIBE (Dutch national database) - simplified for MVP",
+  "units": "kg CO2-eq per kg material",
+  "version": "1.0.0",
+  "materials": {
+    "concrete": {
+      "C20/25": {
+        "embodied_co2_per_kg": 0.110,
+        "density_kg_m3": 2400,
+        "source": "NIBE-generic",
+        "notes": "Standard structural concrete"
+      },
+      "C25/30": {
+        "embodied_co2_per_kg": 0.115,
+        "density_kg_m3": 2400,
+        "source": "NIBE-generic",
+        "notes": "Common structural grade"
+      },
+      "C30/37": {
+        "embodied_co2_per_kg": 0.120,
+        "density_kg_m3": 2400,
+        "source": "NIBE-generic",
+        "notes": "Higher strength concrete"
+      },
+      "C35/45": {
+        "embodied_co2_per_kg": 0.125,
+        "density_kg_m3": 2400,
+        "source": "NIBE-generic",
+        "notes": "High strength concrete"
+      },
+      "concrete_generic": {
+        "embodied_co2_per_kg": 0.115,
+        "density_kg_m3": 2400,
+        "source": "NIBE-fallback",
+        "notes": "Generic fallback when grade unknown"
+      }
+    },
+    "steel": {
+      "steel_structural": {
+        "embodied_co2_per_kg": 1.85,
+        "density_kg_m3": 7850,
+        "source": "NIBE-generic",
+        "notes": "Structural steel sections (S235, S355)"
+      },
+      "steel_reinforcement": {
+        "embodied_co2_per_kg": 1.65,
+        "density_kg_m3": 7850,
+        "source": "NIBE-generic",
+        "notes": "Rebar reinforcement"
+      },
+      "steel_stainless": {
+        "embodied_co2_per_kg": 4.20,
+        "density_kg_m3": 7900,
+        "source": "NIBE-generic",
+        "notes": "Stainless steel"
+      }
+    },
+    "timber": {
+      "timber_softwood": {
+        "embodied_co2_per_kg": -0.95,
+        "density_kg_m3": 500,
+        "source": "NIBE-generic",
+        "notes": "Softwood lumber (carbon sink)"
+      },
+      "timber_hardwood": {
+        "embodied_co2_per_kg": -0.85,
+        "density_kg_m3": 650,
+        "source": "NIBE-generic",
+        "notes": "Hardwood lumber (carbon sink)"
+      },
+      "timber_engineered": {
+        "embodied_co2_per_kg": -0.65,
+        "density_kg_m3": 550,
+        "source": "NIBE-generic",
+        "notes": "Glulam, CLT, LVL"
+      }
+    },
+    "masonry": {
+      "brick_clay": {
+        "embodied_co2_per_kg": 0.220,
+        "density_kg_m3": 1800,
+        "source": "NIBE-generic",
+        "notes": "Clay bricks"
+      },
+      "brick_calcium_silicate": {
+        "embodied_co2_per_kg": 0.135,
+        "density_kg_m3": 1900,
+        "source": "NIBE-generic",
+        "notes": "Kalkzandsteen (Dutch calcium silicate)"
+      },
+      "concrete_block": {
+        "embodied_co2_per_kg": 0.105,
+        "density_kg_m3": 1400,
+        "source": "NIBE-generic",
+        "notes": "Concrete masonry units"
+      }
+    },
+    "insulation": {
+      "insulation_mineral_wool": {
+        "embodied_co2_per_kg": 1.35,
+        "density_kg_m3": 40,
+        "source": "NIBE-generic",
+        "notes": "Glass/rock wool"
+      },
+      "insulation_eps": {
+        "embodied_co2_per_kg": 3.45,
+        "density_kg_m3": 25,
+        "source": "NIBE-generic",
+        "notes": "Expanded polystyrene"
+      },
+      "insulation_xps": {
+        "embodied_co2_per_kg": 5.85,
+        "density_kg_m3": 35,
+        "source": "NIBE-generic",
+        "notes": "Extruded polystyrene"
+      },
+      "insulation_pur_pir": {
+        "embodied_co2_per_kg": 3.95,
+        "density_kg_m3": 30,
+        "source": "NIBE-generic",
+        "notes": "Polyurethane/polyisocyanurate"
+      }
+    },
+    "gypsum": {
+      "gypsum_board": {
+        "embodied_co2_per_kg": 0.185,
+        "density_kg_m3": 900,
+        "source": "NIBE-generic",
+        "notes": "Gypsum board/plasterboard"
+      },
+      "gypsum_generic": {
+        "embodied_co2_per_kg": 0.185,
+        "density_kg_m3": 900,
+        "source": "NIBE-fallback",
+        "notes": "Generic gypsum products"
+      }
+    },
+    "finishing": {
+      "gypsum": {
+        "embodied_co2_per_kg": 0.185,
+        "density_kg_m3": 900,
+        "source": "NIBE-generic",
+        "notes": "Gypsum board/plasterboard"
+      },
+      "glass": {
+        "embodied_co2_per_kg": 0.850,
+        "density_kg_m3": 2500,
+        "source": "NIBE-generic",
+        "notes": "Float glass"
+      },
+      "aluminum": {
+        "embodied_co2_per_kg": 8.50,
+        "density_kg_m3": 2700,
+        "source": "NIBE-generic",
+        "notes": "Aluminum sections"
+      }
+    }
+  },
+  "reinforcement_ratios": {
+    "description": "Typical reinforcement percentages for concrete elements",
+    "foundation_slab": 1.5,
+    "foundation_wall": 1.8,
+    "footing": 1.5,
+    "structural_slab": 2.0,
+    "structural_wall": 2.2,
+    "column": 2.5,
+    "beam": 2.8
+  }
+}

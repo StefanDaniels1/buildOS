@@ -16,5 +16,18 @@
       "description": "IFC analysis tools for buildOS",
       "tools": ["parse_ifc_file", "prepare_batches", "calculate_co2"]
     }
+  },
+  "skills": {
+    "ifc-analysis": {
+      "name": "IFC CO2 Analysis",
+      "description": "Analyze IFC building models for CO2 emissions. Parses IFC files, classifies materials, calculates embodied carbon using Dutch NIBE database, and generates PDF reports.",
+      "path": ".claude/skills/ifc-analysis/SKILL.md",
+      "triggers": [
+        "ifc", "co2", "carbon", "emissions", "sustainability",
+        "nibe", "mpg", "environmental impact", "building analysis"
+      ],
+      "agents": ["batch-processor"],
+      "tools": ["mcp__ifc__*"]
+    }
   }
 }
