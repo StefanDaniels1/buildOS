@@ -111,6 +111,11 @@ function handleSessionCreated(sessionId: string) {
   isNewSession.value = false; // Clear new session flag once session is created
 }
 
+function handleSessionSelect(sessionId: string | null) {
+  selectedSession.value = sessionId;
+  isNewSession.value = false; // Clear new session flag when switching sessions
+}
+
 function handleFileUploaded(file: {name: string, path: string, absolutePath: string, timestamp: number}) {
   uploadedFilePath.value = file.path;
   // Add to uploaded files array so it's available to orchestrator
@@ -310,7 +315,7 @@ function toggleRight() {
           <SessionFilter
             :events="events"
             :selected-session="selectedSession"
-            @select="selectedSession = $event"
+            @select="handleSessionSelect"
           />
 
           <!-- Left sidebar dropzone (below sessions) -->
