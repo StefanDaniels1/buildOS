@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useWebSocket } from './composables/useWebSocket';
+import { useTheme } from './composables/useTheme';
 import LiveChart from './components/LiveChart.vue';
 import ChatWindow from './components/ChatWindow.vue';
 import EventTimeline from './components/EventTimeline.vue';
@@ -9,6 +10,7 @@ import IfcViewer from './components/IfcViewer.vue';
 import { API_BASE_URL } from './config';
 
 const { events, isConnected, error } = useWebSocket();
+const { theme, toggleTheme } = useTheme();
 
 const selectedSession = ref<string | null>(null);
 const showTimeline = ref(true);
@@ -189,7 +191,7 @@ function toggleRight() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-buildos-darker flex flex-col">
+  <div class="min-h-screen theme-bg flex flex-col transition-colors duration-300">
     <!-- Header -->
     <header class="gradient-header px-6 py-4 flex items-center justify-between shadow-lg">
       <div class="flex items-center gap-4">
@@ -259,6 +261,17 @@ function toggleRight() {
               d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
+
+        <!-- Theme Toggle -->
+        <button
+          @click="toggleTheme"
+          class="theme-toggle"
+          :title="theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+        >
+          <div class="theme-toggle-knob">
+            {{ theme === 'dark' ? '🌙' : '☀️' }}
+          </div>
+        </button>
       </div>
     </header>
 
@@ -266,14 +279,14 @@ function toggleRight() {
     <main class="flex-1 flex overflow-hidden">
       <!-- Left sidebar: Sessions -->
       <aside
-        :class="[leftCollapsed ? 'w-12' : 'w-64', 'bg-buildos-dark border-r border-gray-700 overflow-y-auto p-3 transition-all flex flex-col']"
+        :class="[leftCollapsed ? 'w-12' : 'w-64', 'theme-surface theme-border border-r overflow-y-auto p-3 transition-all flex flex-col']"
         @dragover.prevent="isLeftDragging = true"
         @dragleave="isLeftDragging = false"
         @drop.prevent="handleLeftDrop"
       >
         <!-- Collapsed state: Just expand button -->
         <div v-if="leftCollapsed" class="flex flex-col items-center">
-          <button @click="toggleLeft" class="text-gray-400 hover:text-white p-2 rotate-180" title="Expand">
+          <button @click="toggleLeft" class="theme-text-secondary hover:theme-text p-2 rotate-180" title="Expand">
             ⇤
           </button>
         </div>
@@ -281,8 +294,8 @@ function toggleRight() {
         <!-- Expanded state: Full content -->
         <template v-else>
           <div :class="['flex items-center justify-between mb-3', isLeftDragging ? 'ring-2 ring-buildos-primary/40' : '']">
-            <h2 class="text-sm font-medium text-gray-400">Sessions</h2>
-            <button @click="toggleLeft" class="text-gray-400 hover:text-white" title="Collapse">⇤</button>
+            <h2 class="text-sm font-medium theme-text-secondary">Sessions</h2>
+            <button @click="toggleLeft" class="theme-text-secondary hover:theme-text" title="Collapse">⇤</button>
           </div>
 
           <!-- New Session Button -->
@@ -303,14 +316,14 @@ function toggleRight() {
           <!-- Left sidebar dropzone (below sessions) -->
           <div class="mt-3">
             <div
-              class="mx-0 mb-2 border-2 border-dashed border-gray-600 rounded-lg p-3 text-center cursor-pointer transition-colors"
+              class="mx-0 mb-2 border-2 border-dashed theme-border rounded-lg p-3 text-center cursor-pointer transition-colors"
               :class="{ 'border-buildos-primary bg-buildos-primary/10': isLeftDragging }"
               @dragover.prevent="isLeftDragging = true"
               @dragleave="isLeftDragging = false"
               @drop.prevent="handleLeftDrop"
               @click="(leftFileInput as HTMLInputElement).click()"
             >
-              <p class="text-sm text-gray-400">
+              <p class="text-sm theme-text-secondary">
                 Drop IFC file here to upload for viewer or <span class="text-buildos-primary">browse</span>
               </p>
             </div>
@@ -318,12 +331,12 @@ function toggleRight() {
           </div>
 
           <!-- File info when uploaded -->
-          <div v-if="uploadedFilePath" class="mt-6 pt-4 border-t border-gray-700">
-            <h2 class="text-sm font-medium text-gray-400 mb-3">Current File</h2>
-            <div class="bg-buildos-darker rounded-lg p-3">
+          <div v-if="uploadedFilePath" class="mt-6 pt-4 border-t theme-border">
+            <h2 class="text-sm font-medium theme-text-secondary mb-3">Current File</h2>
+            <div class="theme-bg rounded-lg p-3">
               <div class="flex items-center gap-2 text-sm">
                 <span class="text-buildos-primary">📄</span>
-                <span class="text-gray-300 truncate">
+                <span class="theme-text truncate">
                   {{ uploadedFilePath.split('/').pop() }}
                 </span>
               </div>
@@ -337,27 +350,27 @@ function toggleRight() {
           </div>
 
           <!-- All Uploaded Files -->
-          <div v-if="uploadedFiles.length > 0" class="mt-6 pt-4 border-t border-gray-700">
-            <h2 class="text-sm font-medium text-gray-400 mb-3">Loaded Files ({{ uploadedFiles.length }})</h2>
+          <div v-if="uploadedFiles.length > 0" class="mt-6 pt-4 border-t theme-border">
+            <h2 class="text-sm font-medium theme-text-secondary mb-3">Loaded Files ({{ uploadedFiles.length }})</h2>
             <div class="space-y-2 max-h-48 overflow-y-auto">
               <div
                 v-for="file in uploadedFiles"
                 :key="file.timestamp"
-                class="bg-buildos-darker rounded-lg p-2 hover:bg-buildos-dark transition-colors cursor-pointer"
+                class="theme-bg rounded-lg p-2 theme-surface-hover transition-colors cursor-pointer"
                 @click="uploadedFilePath = file.path"
               >
                 <div class="flex items-center gap-2 text-sm">
                   <span class="text-buildos-primary text-xs">📄</span>
-                  <span class="text-gray-300 text-xs truncate flex-1">
+                  <span class="theme-text text-xs truncate flex-1">
                     {{ file.name }}
                   </span>
                 </div>
-                <div class="text-xs text-gray-500 mt-1">
+                <div class="text-xs theme-text-muted mt-1">
                   {{ new Date(file.timestamp).toLocaleTimeString() }}
                 </div>
               </div>
             </div>
-            <p class="text-xs text-gray-500 mt-2 italic">
+            <p class="text-xs theme-text-muted mt-2 italic">
               All files available to orchestrator
             </p>
           </div>
@@ -372,7 +385,7 @@ function toggleRight() {
         <!-- Content area - Toggle between Chat Messages and 3D Viewer -->
         <div class="flex-1 min-h-0 relative">
           <!-- Chat Messages View (scrollable history) -->
-          <div v-show="viewMode === 'chat'" class="absolute inset-0 overflow-y-auto p-3 space-y-3 bg-buildos-dark rounded-lg">
+          <div v-show="viewMode === 'chat'" class="absolute inset-0 overflow-y-auto p-3 space-y-3 theme-surface rounded-lg">
             <!-- Session events -->
             <div v-for="event in displayedEvents" :key="event.id" class="text-sm">
               <!-- User message -->
@@ -384,9 +397,9 @@ function toggleRight() {
 
               <!-- Agent thinking -->
               <div v-else-if="event.hook_event_type === 'AgentThinking'" class="flex">
-                <div class="bg-gray-700 text-gray-300 rounded-lg px-3 py-2 max-w-[80%]">
-                  <span class="text-xs text-gray-500 block mb-1">🧠 Thinking</span>
-                  {{ String(event.payload.thought).slice(0, 200) }}
+                <div class="theme-surface theme-border border rounded-lg px-3 py-2 max-w-[80%]">
+                  <span class="text-xs theme-text-muted block mb-1">🧠 Thinking</span>
+                  <span class="theme-text">{{ String(event.payload.thought).slice(0, 200) }}</span>
                 </div>
               </div>
 
@@ -416,7 +429,7 @@ function toggleRight() {
             </div>
 
             <!-- Empty state -->
-            <div v-if="displayedEvents.length === 0" class="text-center text-gray-500 py-8">
+            <div v-if="displayedEvents.length === 0" class="text-center theme-text-muted py-8">
               <p>Send a message to start</p>
               <p class="text-xs mt-2">Upload an IFC file and ask questions about it</p>
             </div>
@@ -448,21 +461,21 @@ function toggleRight() {
       <!-- Right sidebar: Event Timeline -->
       <aside
         v-if="showTimeline"
-        :class="[rightCollapsed ? 'w-12' : 'w-64', 'bg-buildos-dark border-l border-gray-700 flex flex-col transition-all']"
+        :class="[rightCollapsed ? 'w-12' : 'w-64', 'theme-surface theme-border border-l flex flex-col transition-all']"
       >
         <!-- Collapsed state: Just expand button -->
         <div v-if="rightCollapsed" class="flex flex-col items-center p-3">
-          <button @click="toggleRight" class="text-gray-400 hover:text-white p-2" title="Expand">
+          <button @click="toggleRight" class="theme-text-secondary hover:theme-text p-2" title="Expand">
             ⇥
           </button>
         </div>
 
         <!-- Expanded state: Full content -->
         <template v-else>
-          <div class="p-3 border-b border-gray-700 flex items-center justify-between">
-            <h2 class="text-sm font-medium text-gray-400">Event Timeline</h2>
+          <div class="p-3 border-b theme-border flex items-center justify-between">
+            <h2 class="text-sm font-medium theme-text-secondary">Event Timeline</h2>
             <div class="flex items-center gap-2">
-              <button @click="toggleRight" class="text-gray-400 hover:text-white" title="Collapse">⇥</button>
+              <button @click="toggleRight" class="theme-text-secondary hover:theme-text" title="Collapse">⇥</button>
             </div>
           </div>
           <div class="flex-1 overflow-hidden">
@@ -490,24 +503,24 @@ function toggleRight() {
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       @click.self="showApiKeyModal = false"
     >
-      <div class="bg-buildos-dark border border-gray-700 rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-        <h3 class="text-xl font-bold text-white mb-4">🔑 Anthropic API Key</h3>
+      <div class="theme-surface theme-border border rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+        <h3 class="text-xl font-bold theme-text mb-4">🔑 Anthropic API Key</h3>
         
-        <p class="text-gray-400 text-sm mb-4">
+        <p class="theme-text-secondary text-sm mb-4">
           Enter your Anthropic API key to use the AI features. 
           Get one at <a href="https://console.anthropic.com/" target="_blank" class="text-buildos-primary hover:underline">console.anthropic.com</a>
         </p>
 
         <div v-if="apiKey" class="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
           <p class="text-green-400 text-sm">✓ API Key is configured</p>
-          <p class="text-gray-500 text-xs mt-1">Key: {{ apiKey.slice(0, 10) }}...{{ apiKey.slice(-4) }}</p>
+          <p class="theme-text-muted text-xs mt-1">Key: {{ apiKey.slice(0, 10) }}...{{ apiKey.slice(-4) }}</p>
         </div>
 
         <input
           v-model="apiKeyInput"
           type="password"
           placeholder="sk-ant-api03-..."
-          class="w-full px-4 py-3 bg-buildos-darker border border-gray-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-buildos-primary mb-4"
+          class="input-field w-full mb-4"
         />
 
         <div class="flex gap-3">
@@ -526,13 +539,13 @@ function toggleRight() {
           </button>
           <button
             @click="showApiKeyModal = false"
-            class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors"
+            class="px-4 py-2 theme-surface theme-border border hover:opacity-80 theme-text font-medium rounded-lg transition-colors"
           >
             Cancel
           </button>
         </div>
 
-        <p class="text-gray-500 text-xs mt-4">
+        <p class="theme-text-muted text-xs mt-4">
           Your API key is stored locally in your browser and never sent to our servers.
         </p>
       </div>

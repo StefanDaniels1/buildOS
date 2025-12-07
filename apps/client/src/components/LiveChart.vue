@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, toRef, onMounted, onUnmounted } from 'vue';
+import { ref, toRef, onMounted, onUnmounted, computed } from 'vue';
 import type { HookEvent } from '../types';
 import { useChartData, type TimeRange } from '../composables/useChartData';
 import { useEventColors } from '../composables/useEventColors';
 import { useEventEmojis } from '../composables/useEventEmojis';
+import { useTheme } from '../composables/useTheme';
 
 const props = defineProps<{
   events: HookEvent[];
@@ -13,11 +14,17 @@ const eventsRef = toRef(props, 'events');
 const { chartData, maxCount, timeRange, setTimeRange, TIME_RANGES } = useChartData(eventsRef);
 const { getSessionColor } = useEventColors();
 const { getEmoji } = useEventEmojis();
+const { theme } = useTheme();
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animationFrame: number | null = null;
 
 const timeRanges: TimeRange[] = ['1m', '2m', '3m', '5m', '10m'];
+
+// Theme-aware colors
+const chartBgColor = computed(() => theme.value === 'dark' ? '#0f0f1a' : '#f8fafc');
+const labelColor = computed(() => theme.value === 'dark' ? '#666' : '#64748b');
+const emptyBarColor = computed(() => theme.value === 'dark' ? '#333' : '#e2e8f0');
 
 function draw() {
   const canvas = canvasRef.value;
@@ -41,7 +48,7 @@ function draw() {
   const chartHeight = height - padding.top - padding.bottom;
 
   // Clear
-  ctx.fillStyle = '#0f0f1a';
+  ctx.fillStyle = chartBgColor.value;
   ctx.fillRect(0, 0, width, height);
 
   // Draw bars
@@ -55,7 +62,7 @@ function draw() {
     const y = padding.top + chartHeight - barHeight;
 
     // Get color based on most frequent session in this bucket
-    let color = '#333';
+    let color = emptyBarColor.value;
     if (point.count > 0) {
       const sessions = Object.entries(point.sessions);
       if (sessions.length > 0) {
@@ -104,7 +111,7 @@ function draw() {
   }
 
   // Draw time labels
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = labelColor.value;
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'center';
 
@@ -129,7 +136,7 @@ onUnmounted(() => {
   <div class="card p-3">
     <!-- Time range selector -->
     <div class="flex justify-between items-center mb-2">
-      <span class="text-sm text-gray-400">Event Activity</span>
+      <span class="text-sm theme-text-secondary">Event Activity</span>
       <div class="flex gap-1">
         <button
           v-for="range in timeRanges"
@@ -138,7 +145,7 @@ onUnmounted(() => {
           class="px-2 py-1 text-xs rounded transition-colors"
           :class="timeRange === range
             ? 'bg-buildos-primary text-white'
-            : 'bg-gray-700 text-gray-400 hover:bg-gray-600'"
+            : 'theme-bg theme-text-secondary hover:opacity-80'"
         >
           {{ range }}
         </button>
@@ -152,7 +159,7 @@ onUnmounted(() => {
     />
 
     <!-- Stats -->
-    <div class="flex justify-between mt-2 text-xs text-gray-500">
+    <div class="flex justify-between mt-2 text-xs theme-text-muted">
       <span>{{ events.length }} total events</span>
       <span>Peak: {{ maxCount }} / bucket</span>
     </div>

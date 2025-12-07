@@ -50,7 +50,7 @@ watch(() => props.events.length, async () => {
 <template>
   <div class="flex flex-col h-full">
     <!-- Search bar -->
-    <div class="p-3 border-b border-gray-700 flex items-center justify-between">
+    <div class="p-3 border-b theme-border flex items-center justify-between">
       <input
         v-model="searchQuery"
         type="text"
@@ -58,7 +58,7 @@ watch(() => props.events.length, async () => {
         class="input-field w-2/3 text-sm"
       />
       <div class="flex items-center gap-2">
-        <label class="flex items-center gap-1 cursor-pointer text-xs text-gray-400">
+        <label class="flex items-center gap-1 cursor-pointer text-xs theme-text-secondary">
           <input
             type="checkbox"
             v-model="autoScroll"
@@ -66,7 +66,7 @@ watch(() => props.events.length, async () => {
           />
           Auto-scroll
         </label>
-        <button @click="$emit('toggleCollapse')" class="text-gray-400 hover:text-white text-sm">⇔</button>
+        <button @click="$emit('toggleCollapse')" class="theme-text-secondary hover:theme-text text-sm">⇔</button>
       </div>
     </div>
 
@@ -82,13 +82,13 @@ watch(() => props.events.length, async () => {
         :event="event"
       />
 
-      <div v-if="filteredEvents.length === 0" class="text-center text-gray-500 py-8">
+      <div v-if="filteredEvents.length === 0" class="text-center theme-text-muted py-8">
         No events yet
       </div>
     </div>
 
     <!-- Footer -->
-    <div class="p-2 border-t border-gray-700 flex justify-between items-center text-xs text-gray-400">
+    <div class="p-2 border-t theme-border flex justify-between items-center text-xs theme-text-secondary">
       <span>{{ filteredEvents.length }} events</span>
       <label class="flex items-center gap-1 cursor-pointer">
       </label>

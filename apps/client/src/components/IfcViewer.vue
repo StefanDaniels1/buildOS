@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue';
 import * as THREE from 'three';
 import * as OBC from '@thatopen/components';
 import { API_BASE_URL } from '../config';
+import { useTheme } from '../composables/useTheme';
 
 const props = defineProps<{
   filePath?: string;
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   (e: 'loaded'): void;
   (e: 'error', message: string): void;
 }>();
+
+const { theme } = useTheme();
 
 const containerRef = ref<HTMLDivElement | null>(null);
 const isLoading = ref(false);
@@ -24,6 +27,16 @@ let components: OBC.Components | null = null;
 let world: OBC.SimpleWorld<OBC.SimpleScene, OBC.SimpleCamera, OBC.SimpleRenderer> | null = null;
 let fragments: OBC.FragmentsManager | null = null;
 let ifcLoader: OBC.IfcLoader | null = null;
+
+// Theme-aware background colors for 3D scene
+const sceneBackground = computed(() => theme.value === 'dark' ? 0x1a1a2e : 0xf1f5f9);
+
+// Update scene background when theme changes
+watch(theme, () => {
+  if (world?.scene?.three) {
+    world.scene.three.background = new THREE.Color(sceneBackground.value);
+  }
+});
 
 async function initViewer() {
   if (!containerRef.value) return;
@@ -47,8 +60,8 @@ async function initViewer() {
     // Setup scene (adds lights)
     world.scene.setup();
 
-    // Set background color
-    world.scene.three.background = new THREE.Color(0x1a1a2e);
+    // Set background color based on theme
+    world.scene.three.background = new THREE.Color(sceneBackground.value);
 
     // Add grid
     const grids = components.get(OBC.Grids);
@@ -269,7 +282,7 @@ defineExpose({
       v-if="!hasModel && !isLoading && !error"
       class="absolute inset-0 flex items-center justify-center pointer-events-none"
     >
-      <div class="text-center text-gray-500">
+      <div class="text-center theme-text-muted">
         <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
             d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -308,7 +321,7 @@ defineExpose({
     <!-- Instructions -->
     <div
       v-if="hasModel"
-      class="absolute bottom-4 left-4 text-xs text-gray-500 bg-black/50 px-3 py-2 rounded"
+      class="absolute bottom-4 left-4 text-xs theme-text-muted bg-black/50 px-3 py-2 rounded"
     >
       <span class="mr-3">🖱️ Rotate: Left click + drag</span>
       <span class="mr-3">🔍 Zoom: Scroll</span>

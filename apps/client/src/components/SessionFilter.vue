@@ -80,7 +80,7 @@ async function clearAllSessions() {
       class="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
       :class="selectedSession === null
         ? 'bg-buildos-primary text-white'
-        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
+        : 'theme-bg theme-text hover:opacity-80'"
     >
       <span class="w-2 h-2 rounded-full bg-gray-400"></span>
       <span class="flex-1 text-left text-sm">All Sessions</span>
@@ -95,7 +95,7 @@ async function clearAllSessions() {
       class="w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
       :class="selectedSession === session.id
         ? 'bg-buildos-primary text-white'
-        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'"
+        : 'theme-bg theme-text hover:opacity-80'"
     >
       <span
         class="w-2 h-2 rounded-full flex-shrink-0"
@@ -107,7 +107,7 @@ async function clearAllSessions() {
       <span class="text-xs opacity-70">{{ session.count }}</span>
     </button>
 
-    <div v-if="sessions.length === 0" class="text-center text-gray-500 py-4 text-sm">
+    <div v-if="sessions.length === 0" class="text-center theme-text-muted py-4 text-sm">
       No sessions yet
     </div>
 

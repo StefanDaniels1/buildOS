@@ -54,7 +54,7 @@ function formatTime(timestamp?: number): string {
 
 <template>
   <div
-    class="rounded-md border border-gray-700 bg-buildos-dark hover:border-gray-600 transition-colors cursor-pointer"
+    class="rounded-md border theme-border theme-surface theme-surface-hover transition-colors cursor-pointer"
     @click="expanded = !expanded"
   >
     <!-- Compact view -->
@@ -77,18 +77,18 @@ function formatTime(timestamp?: number): string {
       </span>
 
       <!-- Summary -->
-      <span class="flex-1 text-sm text-gray-300 truncate">
+      <span class="flex-1 text-sm theme-text truncate">
         {{ eventSummary }}
       </span>
 
       <!-- Timestamp -->
-      <span class="text-xs text-gray-500 flex-shrink-0">
+      <span class="text-xs theme-text-muted flex-shrink-0">
         {{ formatTime(event.timestamp) }}
       </span>
 
       <!-- Expand indicator -->
       <svg
-        class="w-4 h-4 text-gray-500 transition-transform"
+        class="w-4 h-4 theme-text-muted transition-transform"
         :class="{ 'rotate-180': expanded }"
         fill="none"
         stroke="currentColor"
@@ -99,21 +99,21 @@ function formatTime(timestamp?: number): string {
     </div>
 
     <!-- Expanded view -->
-    <div v-if="expanded" class="border-t border-gray-700 p-3">
+    <div v-if="expanded" class="border-t theme-border p-3">
       <div class="text-xs space-y-2">
         <div class="flex gap-2">
-          <span class="text-gray-500">Session:</span>
+          <span class="theme-text-muted">Session:</span>
           <span class="font-mono" :style="{ color: sessionColor }">
             {{ event.session_id.slice(0, 8) }}...
           </span>
         </div>
         <div class="flex gap-2">
-          <span class="text-gray-500">Source:</span>
-          <span>{{ event.source_app }}</span>
+          <span class="theme-text-muted">Source:</span>
+          <span class="theme-text">{{ event.source_app }}</span>
         </div>
         <div class="mt-2">
-          <span class="text-gray-500">Payload:</span>
-          <pre class="mt-1 p-2 bg-buildos-darker rounded text-xs overflow-x-auto">{{ JSON.stringify(event.payload, null, 2) }}</pre>
+          <span class="theme-text-muted">Payload:</span>
+          <pre class="mt-1 p-2 theme-bg rounded text-xs overflow-x-auto theme-text">{{ JSON.stringify(event.payload, null, 2) }}</pre>
         </div>
       </div>
     </div>

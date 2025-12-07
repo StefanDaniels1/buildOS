@@ -209,10 +209,10 @@ watch(() => props.initialMessage, async (val) => {
 
   <div v-else class="card flex flex-col h-full">
     <!-- Header -->
-    <div class="p-3 border-b border-gray-700 flex justify-between items-center">
+    <div class="p-3 border-b theme-border flex justify-between items-center">
       <div>
-        <h3 class="font-medium">Chat</h3>
-        <span class="text-xs text-gray-500">{{ sessionId.slice(0, 16) }}...</span>
+        <h3 class="font-medium theme-text">Chat</h3>
+        <span class="text-xs theme-text-muted">{{ sessionId.slice(0, 16) }}...</span>
       </div>
       <button
         @click="newSession"
@@ -238,9 +238,9 @@ watch(() => props.initialMessage, async (val) => {
 
         <!-- Agent thinking -->
         <div v-else-if="event.hook_event_type === 'AgentThinking'" class="flex">
-          <div class="bg-gray-700 text-gray-300 rounded-lg px-3 py-2 max-w-[80%]">
-            <span class="text-xs text-gray-500 block mb-1">🧠 Thinking</span>
-            {{ String(event.payload.thought).slice(0, 200) }}
+          <div class="theme-surface theme-border border rounded-lg px-3 py-2 max-w-[80%]">
+            <span class="text-xs theme-text-muted block mb-1">🧠 Thinking</span>
+            <span class="theme-text">{{ String(event.payload.thought).slice(0, 200) }}</span>
           </div>
         </div>
 
@@ -270,7 +270,7 @@ watch(() => props.initialMessage, async (val) => {
       </div>
 
       <!-- Loading indicator -->
-      <div v-if="isRunning" class="flex items-center gap-2 text-gray-400">
+      <div v-if="isRunning" class="flex items-center gap-2 theme-text-secondary">
         <div class="animate-pulse flex gap-1">
           <div class="w-2 h-2 bg-buildos-primary rounded-full animate-bounce" style="animation-delay: 0ms"></div>
           <div class="w-2 h-2 bg-buildos-primary rounded-full animate-bounce" style="animation-delay: 150ms"></div>
@@ -280,14 +280,14 @@ watch(() => props.initialMessage, async (val) => {
       </div>
 
       <!-- Empty state -->
-      <div v-if="sessionEvents.length === 0" class="text-center text-gray-500 py-8">
+      <div v-if="sessionEvents.length === 0" class="text-center theme-text-muted py-8">
         <p>Send a message to start</p>
         <p class="text-xs mt-2">Upload an IFC file and ask questions about it</p>
       </div>
     </div>
 
     <!-- Input area -->
-    <div class="p-3 border-t border-gray-700">
+    <div class="p-3 border-t theme-border">
       <form @submit.prevent="sendMessage" class="flex gap-2">
         <input
           v-model="message"
@@ -295,7 +295,7 @@ watch(() => props.initialMessage, async (val) => {
           placeholder="Ask about your IFC model..."
           class="input-field flex-1"
         />
-        <button type="button" @click="($refs.fileInput as HTMLInputElement).click()" class="text-gray-300 px-2" title="Attach file">📎</button>
+        <button type="button" @click="($refs.fileInput as HTMLInputElement).click()" class="theme-text-secondary px-2" title="Attach file">📎</button>
         <button
           type="submit"
           class="btn-primary"
