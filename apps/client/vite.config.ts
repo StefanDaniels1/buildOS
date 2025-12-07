@@ -9,5 +9,9 @@ export default defineConfig({
       '/api': 'http://localhost:4000',
       '/events': 'http://localhost:4000',
     }
-  }
+  },
+  optimizeDeps: {
+    exclude: ['web-ifc']
+  },
+  assetsInclude: ['**/*.wasm']
 })

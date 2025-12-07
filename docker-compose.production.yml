@@ -31,7 +31,7 @@ services:
       # Traefik labels for API/Backend
       - "traefik.enable=true"
       # API routes
-      - "traefik.http.routers.buildos-api.rule=Host(`${DOMAIN:-agents.bimai.nl}`) && (PathPrefix(`/api`) || PathPrefix(`/events`) || PathPrefix(`/stream`))"
+      - "traefik.http.routers.buildos-api.rule=Host(`${DOMAIN:-agents.bimai.nl}`) && (PathPrefix(`/api`) || PathPrefix(`/events`) || PathPrefix(`/stream`) || PathPrefix(`/uploads`))"
       - "traefik.http.routers.buildos-api.entrypoints=websecure"
       - "traefik.http.routers.buildos-api.tls.certresolver=letsencrypt"
       - "traefik.http.services.buildos-api.loadbalancer.server.port=4000"

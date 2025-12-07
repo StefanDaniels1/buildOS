@@ -54,25 +54,26 @@ async function initViewer() {
     const grids = components.get(OBC.Grids);
     grids.create(world);
 
-    // Get fragments manager (no init needed in this version)
+    // Get fragments manager
     fragments = components.get(OBC.FragmentsManager);
 
-    // Handle model loaded via groups (FragmentsGroup extends THREE.Group, can be added to scene directly)
-    fragments.groups.onItemSet.add(({ value: group }) => {
+    // Handle model loaded via groups
+    fragments.onFragmentsLoaded.add((group) => {
       if (world) {
         world.scene.three.add(group);
       }
     });
 
-    // Setup IFC loader with explicit WASM path matching @thatopen/components dependency
+    // Setup IFC loader with CDN WASM path
     ifcLoader = components.get(OBC.IfcLoader);
-    await ifcLoader.setup({
-      autoSetWasm: false,
-      wasm: {
-        path: "https://unpkg.com/web-ifc@0.0.68/",
-        absolute: true,
-      },
-    });
+
+    // Configure web-ifc WASM location
+    ifcLoader.settings.wasm = {
+      path: "https://unpkg.com/web-ifc@0.0.68/",
+      absolute: true,
+    };
+
+    await ifcLoader.setup();
 
     // Set initial camera position
     await world.camera.controls.setLookAt(50, 30, 50, 0, 0, 0);
