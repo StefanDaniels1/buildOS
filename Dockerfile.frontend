@@ -1,5 +1,10 @@
 # Frontend Dockerfile for buildOS Dashboard
 # Multi-stage build for optimized production image
+#
+# Build args:
+#   NGINX_CONFIG - Which nginx config to use (default: nginx.conf)
+#     - nginx.conf: Production (Traefik handles API routing)
+#     - nginx.local.conf: Local development (nginx proxies to backend)
 
 # Stage 1: Build frontend
 FROM oven/bun:1 AS builder
@@ -34,8 +39,13 @@ RUN bun run build
 # Stage 2: Production image with nginx
 FROM nginx:alpine
 
-# Copy custom nginx config
-COPY nginx.conf /etc/nginx/nginx.conf
+# Build arg for nginx config selection
+# Default: nginx.conf (production)
+# Local: nginx.local.conf (with backend proxy)
+ARG NGINX_CONFIG=nginx.conf
+
+# Copy selected nginx config
+COPY ${NGINX_CONFIG} /etc/nginx/nginx.conf
 
 # Copy built files from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html

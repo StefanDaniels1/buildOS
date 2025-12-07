@@ -46,6 +46,7 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
+        # NGINX_CONFIG not set = defaults to nginx.conf (Traefik handles API routing)
         # Production values - empty means relative URLs (same origin)
         VITE_API_URL: ""
         VITE_WS_URL: ""

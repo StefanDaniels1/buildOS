@@ -1,8 +1,8 @@
-# Development Docker Compose
+# Local Development Docker Compose
 # Runs frontend and backend as separate services
 #
 # Usage:
-#   docker-compose up --build
+#   docker compose up --build
 #
 # Access:
 #   Frontend: http://localhost:3000
@@ -15,11 +15,11 @@ services:
   backend:
     build:
       context: .
-      dockerfile: Dockerfile.backend.local
+      dockerfile: Dockerfile.backend
     ports:
       - "${SERVER_PORT:-4000}:4000"
     volumes:
-      # Persist uploads and logs
+      # Persist uploads and logs (bind mounts for local dev)
       - ./uploads:/app/uploads
       - ./.logs:/app/.logs
       - ./workspace:/app/workspace
@@ -44,8 +44,10 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend.local
+      dockerfile: Dockerfile.frontend
       args:
+        # Use local nginx config (proxies /api, /uploads, etc. to backend)
+        NGINX_CONFIG: nginx.local.conf
         # Empty = use relative URLs, nginx proxies to backend
         VITE_API_URL: ""
         VITE_WS_URL: ""
