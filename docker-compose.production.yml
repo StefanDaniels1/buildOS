@@ -63,6 +63,19 @@ services:
       start_period: 10s
     networks:
       - dokploy-network
+    labels:
+      # Traefik labels for Frontend with HTTPS
+      - "traefik.enable=true"
+      - "traefik.http.routers.buildos-frontend.rule=Host(`${DOMAIN:-agents.bimai.nl}`)"
+      - "traefik.http.routers.buildos-frontend.entrypoints=websecure"
+      - "traefik.http.routers.buildos-frontend.tls.certresolver=letsencrypt"
+      - "traefik.http.services.buildos-frontend.loadbalancer.server.port=80"
+      # Redirect HTTP to HTTPS
+      - "traefik.http.routers.buildos-frontend-http.rule=Host(`${DOMAIN:-agents.bimai.nl}`)"
+      - "traefik.http.routers.buildos-frontend-http.entrypoints=web"
+      - "traefik.http.routers.buildos-frontend-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true"
 
 volumes:
   uploads_data:
