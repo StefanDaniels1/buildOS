@@ -458,6 +458,8 @@ function toggleRight() {
           :compact="true"
           :available-files="uploadedFiles"
           :api-key="apiKey"
+          :current-session-id="selectedSession"
+          :is-new-session="isNewSession"
           @session-created="handleSessionCreated"
           @file-uploaded="handleFileUploaded"
         />

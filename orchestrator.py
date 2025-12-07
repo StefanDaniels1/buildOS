@@ -33,6 +33,74 @@ from sdk_tools import create_ifc_tools_server
 from conversation_logger import ConversationLogger
 
 
+def load_conversation_history(session_id: str) -> list:
+    """
+    Load conversation history for a session to enable context continuity.
+    
+    Returns a list of (role, content) tuples representing the conversation.
+    """
+    try:
+        events = ConversationLogger.load_session(session_id)
+        
+        history = []
+        for event in events:
+            event_type = event.get("event", "")
+            
+            # User messages
+            if event_type == "user_message":
+                history.append({
+                    "role": "user",
+                    "content": event.get("message", "")
+                })
+            
+            # Model thinking/responses  
+            elif event_type == "model_thinking":
+                history.append({
+                    "role": "assistant",
+                    "content": event.get("content", "")
+                })
+            
+            # Final assistant responses
+            elif event_type == "assistant_message":
+                history.append({
+                    "role": "assistant", 
+                    "content": event.get("message", "")
+                })
+        
+        return history
+    except Exception as e:
+        print(f"Warning: Could not load conversation history: {e}", file=sys.stderr)
+        return []
+
+
+def format_conversation_context(history: list) -> str:
+    """
+    Format conversation history as context for the model.
+    
+    Returns a formatted string summarizing previous exchanges.
+    """
+    if not history:
+        return ""
+    
+    context_parts = ["## Previous Conversation in This Session\n"]
+    
+    for i, exchange in enumerate(history):
+        role = exchange.get("role", "unknown")
+        content = exchange.get("content", "")
+        
+        # Truncate very long content
+        if len(content) > 500:
+            content = content[:500] + "... [truncated]"
+        
+        if role == "user":
+            context_parts.append(f"**User**: {content}")
+        elif role == "assistant":
+            context_parts.append(f"**Assistant**: {content}")
+    
+    context_parts.append("\n---\n")
+    return "\n".join(context_parts)
+
+
 async def send_event(event_type: str, payload: dict, session_id: str, dashboard_url: str):
     """Send event to dashboard server."""
     try:
@@ -228,10 +296,11 @@ async def run_orchestrator(
     Flow:
     1. Validate file exists
     2. Setup workspace + session context
-    3. Register IFC tools via MCP server
-    4. Create ClaudeSDKClient with agents auto-discovered from .claude/agents/
-    5. Send user message to SDK
-    6. Stream responses to dashboard
+    3. Load conversation history for session continuity
+    4. Register IFC tools via MCP server
+    5. Create ClaudeSDKClient with agents auto-discovered from .claude/agents/
+    6. Send user message to SDK with history context
+    7. Stream responses to dashboard
 
     The SDK handles:
     - Agent spawning via Task tool
@@ -243,12 +312,23 @@ async def run_orchestrator(
     # Initialize session logger
     logger = ConversationLogger(session_id)
     
+    # Load previous conversation history for this session
+    conversation_history = load_conversation_history(session_id)
+    is_continuation = len(conversation_history) > 0
+    
+    if is_continuation:
+        print(f"📚 Continuing session {session_id[:8]} with {len(conversation_history)} previous exchanges", file=sys.stderr)
+    else:
+        print(f"🆕 Starting new session {session_id[:8]}", file=sys.stderr)
+    
     # Log user message and available context
     logger.log_user_message(message, file_path)
     logger.log_system_context({
         "file_path": file_path,
         "available_files": available_files or [],
-        "dashboard_url": dashboard_url
+        "dashboard_url": dashboard_url,
+        "is_continuation": is_continuation,
+        "previous_exchanges": len(conversation_history)
     })
 
     # Send session start event
@@ -329,6 +409,20 @@ async def run_orchestrator(
             # Build orchestrator prompt - delegates to skill for workflow
             skill_path = "$CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/SKILL.md"
 
+            # Format conversation history if this is a continuation
+            conversation_context = format_conversation_context(conversation_history)
+            continuation_note = ""
+            if is_continuation:
+                continuation_note = f"""
+## ⚠️ IMPORTANT: This is a Continuation of Session {session_id[:8]}
+
+You are continuing a conversation. The user has already interacted with you in this session.
+Review the previous exchanges below and maintain context. Do not repeat work already done.
+If the user is asking a follow-up question, answer based on the work already completed.
+
+{conversation_context}
+"""
+
             orchestrator_prompt = f"""You are the buildOS orchestrator for building sustainability analysis.
 
 **User Request**: "{message}"
@@ -336,6 +430,7 @@ async def run_orchestrator(
 **Available Files**: {', '.join(available_files) if available_files else "None"}
 **Session Context**: {session_context}/
 **Session ID**: {session_id}
+{continuation_note}
 
 ## Skill-Based Workflow
 

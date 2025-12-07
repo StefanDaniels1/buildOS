@@ -9,6 +9,8 @@ const props = defineProps<{
   compact?: boolean; // New prop for compact mode (input only)
   availableFiles?: Array<{ name: string; path: string; absolutePath: string; timestamp: number }>; // All uploaded files
   apiKey?: string; // User-provided Anthropic API key
+  currentSessionId?: string | null; // Session ID from parent to continue conversation
+  isNewSession?: boolean; // Flag to indicate a new session should be created
 }>();
 
 const emit = defineEmits<{
@@ -19,13 +21,28 @@ const emit = defineEmits<{
 
 const message = ref('');
 const isLoading = ref(false);
-const sessionId = ref(generateSessionId());
+const internalSessionId = ref<string | null>(null);
 const uploadedFile = ref<{ name: string; path: string; absolutePath: string } | null>(null);
 const chatRef = ref<HTMLElement | null>(null);
 const isDragging = ref(false);
 
+// Compute the active session ID - use parent's session or internal one
+const sessionId = computed(() => {
+  // If we have an internal session ID (from new session creation), use it
+  if (internalSessionId.value) {
+    return internalSessionId.value;
+  }
+  // If parent passed a current session, use it to continue the conversation
+  if (props.currentSessionId) {
+    return props.currentSessionId;
+  }
+  // No session yet - will be created on first message
+  return null;
+});
+
 // Filter events for current session
 const sessionEvents = computed(() => {
+  if (!sessionId.value) return [];
   return props.events.filter(e => e.session_id === sessionId.value);
 });
 
@@ -53,6 +70,18 @@ function generateSessionId(): string {
   return `session_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Get or create session ID for sending messages
+function getActiveSessionId(): string {
+  // If we already have an active session, use it
+  if (sessionId.value) {
+    return sessionId.value;
+  }
+  // Create a new session ID
+  const newId = generateSessionId();
+  internalSessionId.value = newId;
+  return newId;
+}
+
 async function sendMessage() {
   const trimmed = message.value.trim();
   if (!trimmed || isLoading.value) return;
@@ -67,14 +96,18 @@ async function sendMessage() {
   const userMessage = trimmed;
   message.value = '';
 
+  // Get or create the session ID
+  const activeSessionId = getActiveSessionId();
+
   // DEBUG: Log context
   console.log('📤 SENDING MESSAGE');
+  console.log('🔍 Session ID:', activeSessionId);
   console.log('🔍 availableFiles length:', props.availableFiles?.length || 0);
   console.log('🔑 Has API key:', !!props.apiKey);
 
   const payload = {
     message: userMessage,
-    session_id: sessionId.value,
+    session_id: activeSessionId,
     file_path: uploadedFile.value?.absolutePath,
     available_files: props.availableFiles?.map(f => f.absolutePath) || [],
     api_key: props.apiKey || undefined
@@ -94,7 +127,7 @@ async function sendMessage() {
       throw new Error(data.error || 'Failed to send message');
     }
 
-    emit('sessionCreated', sessionId.value);
+    emit('sessionCreated', activeSessionId);
   } catch (error) {
     console.error('Error sending message:', error);
   } finally {
@@ -154,10 +187,23 @@ function clearFile() {
 }
 
 function newSession() {
-  sessionId.value = generateSessionId();
+  internalSessionId.value = generateSessionId();
   uploadedFile.value = null;
   message.value = '';
 }
+
+// Reset internal session when parent signals a new session via key change
+watch(() => props.isNewSession, (isNew) => {
+  if (isNew) {
+    internalSessionId.value = null;
+  }
+});
+
+// Also reset when currentSessionId changes (switching sessions)
+watch(() => props.currentSessionId, () => {
+  // Clear internal session to use the parent's session
+  internalSessionId.value = null;
+});
 
 // Auto-scroll chat
 watch(sessionEvents, async () => {
@@ -212,7 +258,7 @@ watch(() => props.initialMessage, async (val) => {
     <div class="p-3 border-b theme-border flex justify-between items-center">
       <div>
         <h3 class="font-medium theme-text">Chat</h3>
-        <span class="text-xs theme-text-muted">{{ sessionId.slice(0, 16) }}...</span>
+        <span class="text-xs theme-text-muted">{{ sessionId ? sessionId.slice(0, 16) + '...' : 'New Session' }}</span>
       </div>
       <button
         @click="newSession"
