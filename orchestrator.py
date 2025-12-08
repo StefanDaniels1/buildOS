@@ -190,12 +190,18 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
     - ToolResultBlock → Tool results with outputs
     - ResultMessage → Model metrics (cost, tokens, duration)
     """
+    # Track the last text response for the final Stop event
+    last_text_response = ""
+    
     async for message in client.receive_response():
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, TextBlock):
                     # Model thinking/reasoning - LOG IT
                     logger.log_model_thinking(block.text, agent_id="orchestrator")
+                    
+                    # Track this as the last text response
+                    last_text_response = block.text
                     
                     # Also send to dashboard for real-time UI
                     await send_event("AgentThinking", {
@@ -275,10 +281,16 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                 "timestamp": datetime.now().isoformat()
             }, session_id, dashboard_url)
 
-            # Send completion event
+            # Use the last text response which contains the final answer with file paths
+            # Fall back to message.result if no text response was captured
+            final_message = last_text_response if last_text_response else (
+                message.result if hasattr(message, 'result') else 'Done'
+            )
+
+            # Send completion event with the full final response
             await send_event("Stop", {
                 "status": "success" if not message.is_error else "error",
-                "message": f"Analysis completed: {message.result if hasattr(message, 'result') else 'Done'}",
+                "message": final_message,
                 "timestamp": datetime.now().isoformat()
             }, session_id, dashboard_url)
 
@@ -389,7 +401,7 @@ async def run_orchestrator(
             "Read",           # File reading
             "Write",          # File writing
             "Bash",           # Command execution
-            "mcp__ifc__*"     # All IFC tools
+            "mcp__ifc__*"     # All IFC tools (including Excel/PPTX generation)
         ],
         permission_mode="bypassPermissions",  # Auto-approve for automation
         cwd=str(workspace),
@@ -452,6 +464,28 @@ The skill file contains:
 | Classify | Task agents (batch-processor) | Material classification |
 | Calculate CO2 | `mcp__ifc__calculate_co2` | CO2 impact calculation |
 | Generate PDF | `python scripts/generate_pdf.py` | Create report |
+| **Generate Excel** | `mcp__ifc__generate_excel_report` | Create Excel spreadsheet |
+| **Generate PPTX** | `mcp__ifc__generate_presentation` | Create PowerPoint presentation |
+
+## Excel & PowerPoint Skills
+
+You have access to Claude's built-in document generation skills:
+
+- **Excel Reports**: Use `mcp__ifc__generate_excel_report` to create formatted Excel spreadsheets with data analysis, charts, and proper formatting. Great for:
+  - Material quantity takeoffs
+  - CO2 analysis summaries
+  - Element inventories
+  - Cost breakdowns
+
+- **PowerPoint Presentations**: Use `mcp__ifc__generate_presentation` to create professional presentations with slides and visualizations. Great for:
+  - Analysis summaries for stakeholders
+  - Project reports
+  - Sustainability assessments
+
+Both tools accept:
+- `prompt`: Description of what to create
+- `output_dir`: Where to save the file (use {session_context}/)
+- `data_json`: Optional JSON data to include in the document
 
 ## Session Context
 

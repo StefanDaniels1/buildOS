@@ -396,6 +396,13 @@ const server = Bun.serve({
           if (ext === 'ifc') contentType = 'application/x-step';
           else if (ext === 'json') contentType = 'application/json';
           else if (ext === 'csv') contentType = 'text/csv';
+          else if (ext === 'pdf') contentType = 'application/pdf';
+          else if (ext === 'xlsx') contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          else if (ext === 'xls') contentType = 'application/vnd.ms-excel';
+          else if (ext === 'pptx') contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+          else if (ext === 'ppt') contentType = 'application/vnd.ms-powerpoint';
+          else if (ext === 'docx') contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          else if (ext === 'doc') contentType = 'application/msword';
 
           return new Response(file, {
             headers: {
@@ -412,6 +419,91 @@ const server = Bun.serve({
         }
       } catch (error) {
         console.error('Error serving file:', error);
+        return new Response(JSON.stringify({ error: 'Failed to serve file' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // GET /workspace/* - Serve workspace files (generated reports, etc.)
+    if (url.pathname.startsWith('/workspace/') && req.method === 'GET') {
+      try {
+        const relativePath = url.pathname.replace('/workspace/', '');
+        
+        // Use process.cwd() to find workspace directory
+        let workspaceDir = process.cwd();
+        if (workspaceDir.includes('/apps/server')) {
+          workspaceDir = workspaceDir.replace('/apps/server', '') + '/workspace';
+        } else if (workspaceDir.includes('/apps')) {
+          workspaceDir = workspaceDir.replace('/apps', '') + '/workspace';
+        } else {
+          workspaceDir = workspaceDir + '/workspace';
+        }
+        
+        const filepath = `${workspaceDir}/${relativePath}`;
+
+        console.log('Serving workspace file request:', { pathname: url.pathname, relativePath, workspaceDir, filepath });
+
+        const file = Bun.file(filepath);
+        const exists = await file.exists();
+        console.log('Workspace file exists:', exists);
+
+        if (exists) {
+          // Determine content type based on extension
+          const ext = relativePath.split('.').pop()?.toLowerCase() || '';
+          let contentType = 'application/octet-stream';
+          let disposition = 'inline';
+          
+          if (ext === 'ifc') contentType = 'application/x-step';
+          else if (ext === 'json') contentType = 'application/json';
+          else if (ext === 'csv') contentType = 'text/csv';
+          else if (ext === 'pdf') contentType = 'application/pdf';
+          else if (ext === 'xlsx') {
+            contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            disposition = 'attachment';  // Force download for Excel
+          }
+          else if (ext === 'xls') {
+            contentType = 'application/vnd.ms-excel';
+            disposition = 'attachment';
+          }
+          else if (ext === 'pptx') {
+            contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+            disposition = 'attachment';  // Force download for PowerPoint
+          }
+          else if (ext === 'ppt') {
+            contentType = 'application/vnd.ms-powerpoint';
+            disposition = 'attachment';
+          }
+          else if (ext === 'docx') {
+            contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            disposition = 'attachment';  // Force download for Word
+          }
+          else if (ext === 'doc') {
+            contentType = 'application/msword';
+            disposition = 'attachment';
+          }
+          else if (ext === 'txt') contentType = 'text/plain';
+          else if (ext === 'html') contentType = 'text/html';
+
+          // Extract just the filename for disposition
+          const filename = relativePath.split('/').pop() || relativePath;
+
+          return new Response(file, {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': contentType,
+              'Content-Disposition': `${disposition}; filename="${filename}"`
+            }
+          });
+        } else {
+          return new Response(JSON.stringify({ error: 'File not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (error) {
+        console.error('Error serving workspace file:', error);
         return new Response(JSON.stringify({ error: 'Failed to serve file' }), {
           status: 500,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }

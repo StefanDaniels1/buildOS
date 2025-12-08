@@ -124,22 +124,70 @@ function handleFileUploaded(file: {name: string, path: string, absolutePath: str
   console.log('✅ App.vue: File added via ChatWindow:', file, 'Total files:', uploadedFiles.value.length);
 }
 
-// Extract PDF path from message content
-function extractPdfPath(message: string): string | null {
-  // Look for PDF file paths in various formats
-  const patterns = [
-    /([^\s]+\.pdf)/gi,                          // Simple .pdf path
-    /["']([^"']+\.pdf)["']/gi,                  // Quoted PDF path
-    /(?:generated|created|saved).*?([^\s]+\.pdf)/gi,  // Generated PDF
-  ];
+// Extract downloadable file paths from message content
+function extractDownloadableFiles(message: string): Array<{ path: string; type: string; label: string }> {
+  const files: Array<{ path: string; type: string; label: string }> = [];
+  const seenPaths = new Set<string>();
   
-  for (const pattern of patterns) {
-    const match = pattern.exec(message);
-    if (match) {
-      return match[1];
+  // Helper to add file if not seen
+  const addFile = (rawPath: string, type: string, label: string) => {
+    // Clean up the path - remove quotes, backticks, and surrounding whitespace
+    const cleanPath = rawPath.replace(/^[\s"'`]+|[\s"'`]+$/g, '').trim();
+    
+    // Skip if empty or doesn't look like a path
+    if (!cleanPath || cleanPath.length < 5) return;
+    
+    // Normalize the path for comparison (case-insensitive, handle Docker paths)
+    let normalizedPath = cleanPath.toLowerCase();
+    
+    // Remove /app/ prefix for comparison (Docker container path)
+    if (normalizedPath.startsWith('/app/')) {
+      normalizedPath = normalizedPath.slice(4);
     }
+    
+    if (!seenPaths.has(normalizedPath)) {
+      seenPaths.add(normalizedPath);
+      files.push({ path: cleanPath, type, label });
+      console.log(`📥 Found downloadable file: ${cleanPath} (${type})`);
+    }
+  };
+  
+  // Use simpler, more permissive regex patterns that work with various formats
+  // These patterns match file paths ending with specific extensions
+  
+  // PDF files - match paths ending in .pdf
+  const pdfRegex = /([^\s"'`()\[\]<>]+\.pdf)\b/gi;
+  let match;
+  while ((match = pdfRegex.exec(message)) !== null) {
+    addFile(match[1], 'pdf', 'PDF Report');
   }
-  return null;
+  
+  // Excel files (.xlsx or .xls) - match paths ending in .xlsx or .xls
+  const excelRegex = /([^\s"'`()\[\]<>]+\.xlsx?)\b/gi;
+  while ((match = excelRegex.exec(message)) !== null) {
+    addFile(match[1], 'excel', 'Excel Spreadsheet');
+  }
+  
+  // PowerPoint files (.pptx or .ppt)
+  const pptxRegex = /([^\s"'`()\[\]<>]+\.pptx?)\b/gi;
+  while ((match = pptxRegex.exec(message)) !== null) {
+    addFile(match[1], 'pptx', 'PowerPoint Presentation');
+  }
+  
+  // Word documents (.docx or .doc)
+  const docxRegex = /([^\s"'`()\[\]<>]+\.docx?)\b/gi;
+  while ((match = docxRegex.exec(message)) !== null) {
+    addFile(match[1], 'docx', 'Word Document');
+  }
+  
+  return files;
+}
+
+// Legacy: Extract PDF path from message content (for backwards compatibility)
+function extractPdfPath(message: string): string | null {
+  const files = extractDownloadableFiles(message);
+  const pdf = files.find(f => f.type === 'pdf');
+  return pdf?.path || null;
 }
 
 // Get download URL for a file
@@ -148,18 +196,53 @@ function getDownloadUrl(filePath: string): string {
   if (filePath.startsWith('http')) {
     return filePath;
   }
-  // Handle workspace paths
+  
+  // Handle Docker container paths like /app/workspace/...
+  if (filePath.includes('/app/workspace/')) {
+    const relativePath = filePath.split('/app/workspace/')[1];
+    return `${API_BASE_URL}/workspace/${relativePath}`;
+  }
+  
+  // Handle workspace paths like /workspace/... or ./workspace/...
   if (filePath.includes('/workspace/')) {
     const relativePath = filePath.split('/workspace/')[1];
     return `${API_BASE_URL}/workspace/${relativePath}`;
   }
+  
+  // Handle paths that start with workspace/ (without leading slash)
+  if (filePath.startsWith('workspace/')) {
+    const relativePath = filePath.slice('workspace/'.length);
+    return `${API_BASE_URL}/workspace/${relativePath}`;
+  }
+  
+  // Handle paths that start with ./workspace/
+  if (filePath.startsWith('./workspace/')) {
+    const relativePath = filePath.slice('./workspace/'.length);
+    return `${API_BASE_URL}/workspace/${relativePath}`;
+  }
+  
+  // Handle Docker container uploads paths like /app/uploads/...
+  if (filePath.includes('/app/uploads/')) {
+    const relativePath = filePath.split('/app/uploads/')[1];
+    return `${API_BASE_URL}/uploads/${relativePath}`;
+  }
+  
   // Handle uploads paths
   if (filePath.includes('/uploads/')) {
     const relativePath = filePath.split('/uploads/')[1];
     return `${API_BASE_URL}/uploads/${relativePath}`;
   }
-  // Default: assume it's relative to workspace
-  return `${API_BASE_URL}/workspace/${filePath}`;
+  
+  // Handle paths that start with uploads/ (without leading slash)
+  if (filePath.startsWith('uploads/')) {
+    const relativePath = filePath.slice('uploads/'.length);
+    return `${API_BASE_URL}/uploads/${relativePath}`;
+  }
+  
+  // Default: assume it's a direct path relative to the API
+  // Don't add /workspace/ prefix as it might already include the correct path structure
+  console.log(`⚠️ Unknown file path format: ${filePath}`);
+  return `${API_BASE_URL}/${filePath}`;
 }
 
 function createNewSession() {
@@ -460,19 +543,38 @@ function toggleRight() {
                 <div class="bg-green-900/50 text-green-300 rounded-lg px-4 py-3 max-w-[90%] w-full">
                   <span class="text-xs text-green-500 block mb-2">✅ Complete</span>
                   <MarkdownRenderer :content="String(event.payload.message)" />
-                  <!-- PDF Download Button -->
-                  <div v-if="extractPdfPath(String(event.payload.message))" class="mt-4 pt-3 border-t border-green-700/50">
-                    <a
-                      :href="getDownloadUrl(extractPdfPath(String(event.payload.message)) || '')"
-                      target="_blank"
-                      download
-                      class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors text-sm font-medium"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      Download PDF Report
-                    </a>
+                  <!-- Downloadable Files -->
+                  <div v-if="extractDownloadableFiles(String(event.payload.message)).length > 0" class="mt-4 pt-3 border-t border-green-700/50">
+                    <div class="flex flex-wrap gap-2">
+                      <a
+                        v-for="(file, index) in extractDownloadableFiles(String(event.payload.message))"
+                        :key="index"
+                        :href="getDownloadUrl(file.path)"
+                        target="_blank"
+                        download
+                        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+                        :class="{
+                          'bg-green-600 hover:bg-green-500 text-white': file.type === 'pdf',
+                          'bg-emerald-600 hover:bg-emerald-500 text-white': file.type === 'excel',
+                          'bg-orange-600 hover:bg-orange-500 text-white': file.type === 'pptx',
+                          'bg-blue-600 hover:bg-blue-500 text-white': file.type === 'docx'
+                        }"
+                      >
+                        <svg v-if="file.type === 'pdf'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <svg v-else-if="file.type === 'excel'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                        </svg>
+                        <svg v-else-if="file.type === 'pptx'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Download {{ file.label }}
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>

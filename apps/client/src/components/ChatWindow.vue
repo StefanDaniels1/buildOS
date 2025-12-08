@@ -278,7 +278,7 @@ watch(() => props.initialMessage, async (val) => {
       <div v-for="event in sessionEvents" :key="event.id" class="text-sm">
         <!-- User message -->
         <div v-if="event.hook_event_type === 'UserPromptSubmit'" class="flex justify-end">
-          <div class="bg-buildos-primary text-white rounded-lg px-3 py-2 max-w-[80%]">
+          <div class="bg-blue-600 text-white rounded-lg px-3 py-2 max-w-[80%]">
             {{ event.payload.prompt }}
           </div>
         </div>

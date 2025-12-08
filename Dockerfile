@@ -41,7 +41,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=server-builder /app/server/node_modules ./apps/server/node_modules
 
 # Copy application code
-COPY orchestrator.py conversation_logger.py load_env.py sdk_tools.py ./
+COPY orchestrator.py conversation_logger.py load_env.py sdk_tools.py skills_client.py ./
 COPY apps/server/src ./apps/server/src/
 COPY apps/server/package.json ./apps/server/
 

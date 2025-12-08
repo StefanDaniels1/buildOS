@@ -260,6 +260,423 @@ async def calculate_co2(args: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
+@tool(
+    name="generate_excel_report",
+    description="Generate an Excel spreadsheet using Claude's Excel skill. Use this for creating formatted Excel reports with data analysis, charts, and proper formatting. The data_json parameter can be either a JSON string or a file path to a JSON file.",
+    input_schema={
+        "prompt": str,
+        "output_dir": str,
+        "data_json": str  # Optional: JSON string OR file path to JSON file
+    }
+)
+async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate an Excel report using Claude's Excel skill.
+    
+    Args:
+        prompt: Description of what Excel file to create
+        output_dir: Directory to save the output file
+        data_json: Optional JSON string OR file path to a JSON file
+        
+    Returns:
+        Success status and file path
+    """
+    try:
+        import os
+        from pathlib import Path
+        
+        # First, try to use the Skills API if available
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        
+        # Load data from file path or parse JSON string
+        data_str = ""
+        if args.get("data_json"):
+            data_json_input = args["data_json"]
+            
+            # Check if it's a file path
+            if data_json_input.startswith("/") or data_json_input.startswith("./"):
+                try:
+                    with open(data_json_input, 'r') as f:
+                        data = json.load(f)
+                        data_str = json.dumps(data, indent=2)
+                except FileNotFoundError:
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({
+                                "success": False,
+                                "error": f"Data file not found: {data_json_input}"
+                            }, indent=2)
+                        }],
+                        "is_error": True
+                    }
+                except json.JSONDecodeError as e:
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({
+                                "success": False,
+                                "error": f"Invalid JSON in file {data_json_input}: {str(e)}"
+                            }, indent=2)
+                        }],
+                        "is_error": True
+                    }
+            else:
+                # Try to parse as JSON string
+                try:
+                    data = json.loads(data_json_input)
+                    data_str = json.dumps(data, indent=2)
+                except json.JSONDecodeError:
+                    # Use as-is if not valid JSON
+                    data_str = data_json_input
+        
+        # Try Skills API first (if anthropic package is available and API key is set)
+        if api_key:
+            try:
+                from skills_client import SkillsClient
+                
+                client = SkillsClient(api_key=api_key)
+                
+                # Build prompt with data
+                full_prompt = args["prompt"]
+                if data_str:
+                    full_prompt = f"""Using the following data:
+
+```json
+{data_str}
+```
+
+{args["prompt"]}
+"""
+                
+                result = await client.generate_excel(
+                    prompt=full_prompt,
+                    output_dir=args["output_dir"]
+                )
+                
+                if result["success"] and result["files"]:
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({
+                                "success": True,
+                                "files": result["files"],
+                                "response": result["response"][:500] if result["response"] else "",
+                                "method": "claude_skills_api"
+                            }, indent=2)
+                        }]
+                    }
+                else:
+                    # Skills API failed, fall through to openpyxl fallback
+                    print(f"Skills API failed: {result.get('error')}, trying openpyxl fallback")
+                    
+            except ImportError:
+                print("anthropic package not available, using openpyxl fallback")
+            except Exception as e:
+                print(f"Skills API error: {e}, using openpyxl fallback")
+        
+        # Fallback: Use openpyxl to create Excel file locally
+        return await _generate_excel_with_openpyxl(args, data_str)
+        
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+async def _generate_excel_with_openpyxl(args: Dict[str, Any], data_str: str) -> Dict[str, Any]:
+    """
+    Fallback Excel generation using openpyxl.
+    Creates a basic Excel file with the provided data.
+    """
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, PatternFill, Alignment
+        from openpyxl.utils import get_column_letter
+        from pathlib import Path
+        from datetime import datetime
+        
+        # Parse data if available
+        data = None
+        if data_str:
+            try:
+                data = json.loads(data_str)
+            except json.JSONDecodeError:
+                pass
+        
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Report"
+        
+        # Style definitions
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        title_font = Font(bold=True, size=14)
+        
+        # Add title
+        ws['A1'] = "Generated Report"
+        ws['A1'].font = title_font
+        ws['A2'] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        ws['A3'] = f"Prompt: {args['prompt'][:100]}..."
+        
+        row = 5
+        
+        # If we have structured data, try to render it
+        if data and isinstance(data, dict):
+            # Handle CO2 report format
+            if 'summary' in data:
+                ws[f'A{row}'] = "Summary"
+                ws[f'A{row}'].font = title_font
+                row += 1
+                
+                summary = data['summary']
+                for key, value in summary.items():
+                    ws[f'A{row}'] = key.replace('_', ' ').title()
+                    ws[f'B{row}'] = str(value)
+                    row += 1
+                row += 1
+            
+            # Handle by_category
+            if 'by_category' in data:
+                ws[f'A{row}'] = "By Category"
+                ws[f'A{row}'].font = title_font
+                row += 1
+                
+                headers = ["Category", "Count", "CO2 (kg)", "Mass (kg)", "Percentage"]
+                for col, header in enumerate(headers, 1):
+                    cell = ws.cell(row=row, column=col)
+                    cell.value = header
+                    cell.font = header_font
+                    cell.fill = header_fill
+                row += 1
+                
+                for category, details in data['by_category'].items():
+                    ws.cell(row=row, column=1).value = category
+                    ws.cell(row=row, column=2).value = details.get('count', 0)
+                    ws.cell(row=row, column=3).value = details.get('co2_kg', 0)
+                    ws.cell(row=row, column=4).value = details.get('mass_kg', 0)
+                    ws.cell(row=row, column=5).value = details.get('percentage', 0)
+                    row += 1
+                row += 1
+            
+            # Handle detailed_results
+            if 'detailed_results' in data and data['detailed_results']:
+                ws[f'A{row}'] = "Detailed Results"
+                ws[f'A{row}'].font = title_font
+                row += 1
+                
+                # Get headers from first item
+                first_item = data['detailed_results'][0]
+                headers = list(first_item.keys())
+                for col, header in enumerate(headers, 1):
+                    cell = ws.cell(row=row, column=col)
+                    cell.value = header.replace('_', ' ').title()
+                    cell.font = header_font
+                    cell.fill = header_fill
+                row += 1
+                
+                for item in data['detailed_results']:
+                    for col, key in enumerate(headers, 1):
+                        ws.cell(row=row, column=col).value = item.get(key, '')
+                    row += 1
+        
+        # Adjust column widths
+        for col in range(1, 15):
+            ws.column_dimensions[get_column_letter(col)].width = 18
+        
+        # Save file
+        output_dir = Path(args["output_dir"])
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_file = output_dir / f"report_{timestamp}.xlsx"
+        wb.save(str(output_file))
+        
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": True,
+                    "files": [str(output_file)],
+                    "response": f"Excel file created using openpyxl: {output_file}",
+                    "method": "openpyxl_fallback"
+                }, indent=2)
+            }]
+        }
+        
+    except ImportError:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": "Neither anthropic (for Skills API) nor openpyxl (for local generation) is available. Install one of: pip install anthropic OR pip install openpyxl"
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="generate_presentation",
+    description="Generate a PowerPoint presentation using Claude's PowerPoint skill. Use this for creating professional presentations with slides, charts, and formatting. The data_json parameter can be either a JSON string or a file path to a JSON file.",
+    input_schema={
+        "prompt": str,
+        "output_dir": str,
+        "data_json": str  # Optional: JSON string OR file path to JSON file
+    }
+)
+async def generate_presentation(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate a PowerPoint presentation using Claude's PPTX skill.
+    
+    Args:
+        prompt: Description of what presentation to create
+        output_dir: Directory to save the output file
+        data_json: Optional JSON string OR file path to a JSON file
+        
+    Returns:
+        Success status and file path
+    """
+    try:
+        import os
+        
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "success": False,
+                        "error": "ANTHROPIC_API_KEY not set. Required for PowerPoint skill. Note: PowerPoint generation requires the Claude Skills API (no local fallback available)."
+                    }, indent=2)
+                }],
+                "is_error": True
+            }
+        
+        # Load data from file path or parse JSON string
+        data_str = ""
+        if args.get("data_json"):
+            data_json_input = args["data_json"]
+            
+            # Check if it's a file path
+            if data_json_input.startswith("/") or data_json_input.startswith("./"):
+                try:
+                    with open(data_json_input, 'r') as f:
+                        data = json.load(f)
+                        data_str = json.dumps(data, indent=2)
+                except FileNotFoundError:
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({
+                                "success": False,
+                                "error": f"Data file not found: {data_json_input}"
+                            }, indent=2)
+                        }],
+                        "is_error": True
+                    }
+                except json.JSONDecodeError as e:
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": json.dumps({
+                                "success": False,
+                                "error": f"Invalid JSON in file {data_json_input}: {str(e)}"
+                            }, indent=2)
+                        }],
+                        "is_error": True
+                    }
+            else:
+                # Try to parse as JSON string
+                try:
+                    data = json.loads(data_json_input)
+                    data_str = json.dumps(data, indent=2)
+                except json.JSONDecodeError:
+                    data_str = data_json_input
+        
+        from skills_client import SkillsClient
+        
+        client = SkillsClient(api_key=api_key)
+        
+        full_prompt = args["prompt"]
+        if data_str:
+            full_prompt = f"""Using the following data:
+
+```json
+{data_str}
+```
+
+{args["prompt"]}
+"""
+        
+        result = await client.generate_presentation(
+            prompt=full_prompt,
+            output_dir=args["output_dir"]
+        )
+        
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": result["success"],
+                    "files": result["files"],
+                    "response": result["response"][:500] if result["response"] else "",
+                    "error": result.get("error")
+                }, indent=2)
+            }],
+            "is_error": not result["success"]
+        }
+        
+    except ImportError:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": "anthropic package not installed. PowerPoint generation requires the Claude Skills API. Install with: pip install anthropic"
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
 def create_ifc_tools_server():
     """
     Create MCP server with all IFC analysis tools.
@@ -268,9 +685,18 @@ def create_ifc_tools_server():
     - mcp__ifc__parse_ifc_file
     - mcp__ifc__prepare_batches
     - mcp__ifc__calculate_co2
+    - mcp__ifc__generate_excel_report
+    - mcp__ifc__generate_presentation
     """
     return create_sdk_mcp_server(
         name="ifc",
         version="1.0.0",
-        tools=[parse_ifc_file, prepare_batches, calculate_co2]
+        tools=[
+            parse_ifc_file, 
+            prepare_batches, 
+            calculate_co2,
+            generate_excel_report,
+            generate_presentation
+        ]
     )
+
