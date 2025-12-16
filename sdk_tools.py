@@ -677,6 +677,544 @@ async def generate_presentation(args: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
+@tool(
+    name="generate_pdf_report",
+    description="Generate a PDF sustainability report using ReportLab. This creates a professional PDF directly without external APIs. Use this for CO2 analysis reports. Requires a co2_report.json file as input.",
+    input_schema={
+        "co2_report_path": str,
+        "ifc_filename": str,
+        "output_path": str
+    }
+)
+async def generate_pdf_report(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate a PDF sustainability report using ReportLab (local generation, no API).
+
+    Args:
+        co2_report_path: Path to the CO2 report JSON file (e.g., co2_report.json)
+        ifc_filename: Original IFC filename (for report title)
+        output_path: Where to save the PDF file
+
+    Returns:
+        Success status and file path
+    """
+    try:
+        from pathlib import Path
+        import sys
+
+        co2_report_path = Path(args["co2_report_path"])
+        output_path = Path(args["output_path"])
+        ifc_filename = args["ifc_filename"]
+
+        # Validate input file exists
+        if not co2_report_path.exists():
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "success": False,
+                        "error": f"CO2 report file not found: {co2_report_path}"
+                    }, indent=2)
+                }],
+                "is_error": True
+            }
+
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Import the ReportLab-based PDF generator
+        tools_path = Path(__file__).parent / ".claude" / "tools"
+        sys.path.insert(0, str(tools_path))
+
+        try:
+            from generate_co2_pdf import generate_co2_report_pdf
+        except ImportError:
+            # Fallback: try to import from skills path
+            skills_path = Path(__file__).parent / ".claude" / "skills" / "ifc-analysis" / "scripts"
+            sys.path.insert(0, str(skills_path))
+            from generate_pdf import generate_co2_report_pdf
+
+        # Generate PDF using ReportLab
+        result = generate_co2_report_pdf(
+            co2_report_file=str(co2_report_path),
+            ifc_filename=ifc_filename,
+            output_pdf=str(output_path)
+        )
+
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": True,
+                    "pdf_file": str(output_path),
+                    "total_co2_kg": result.get("total_co2_kg"),
+                    "completeness_pct": result.get("completeness_pct"),
+                    "message": f"PDF report generated: {output_path}"
+                }, indent=2)
+            }]
+        }
+
+    except ImportError as e:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": f"ReportLab not installed. Install with: pip install reportlab. Details: {str(e)}"
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="check_workflow_stage",
+    description="Check if a workflow stage is complete by looking for stage completion file. Use this before starting a new stage to verify prerequisites are met.",
+    input_schema={
+        "session_context": str,
+        "stage_name": str
+    }
+)
+async def check_workflow_stage(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Check if a workflow stage is complete.
+    
+    Args:
+        session_context: Path to session context directory
+        stage_name: Name of stage to check (parse, batch, classify, aggregate, report)
+    
+    Returns:
+        Stage completion status and metadata
+    """
+    try:
+        stage_file = Path(args["session_context"]) / f"stage_{args['stage_name']}_complete.json"
+        
+        if stage_file.exists():
+            with open(stage_file, 'r') as f:
+                state = json.load(f)
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "complete": True,
+                        "stage": args["stage_name"],
+                        "state": state
+                    }, indent=2)
+                }]
+            }
+        else:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "complete": False,
+                        "stage": args["stage_name"],
+                        "message": f"Stage {args['stage_name']} not yet complete"
+                    }, indent=2)
+                }]
+            }
+    except Exception as e:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "complete": False,
+                    "error": str(e)
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="mark_stage_complete",
+    description="Mark a workflow stage as complete by writing a completion file with metadata. Use this after successfully completing a stage.",
+    input_schema={
+        "session_context": str,
+        "stage_name": str,
+        "output_files": list,
+        "metadata": dict
+    }
+)
+async def mark_stage_complete(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Mark a workflow stage as complete.
+    
+    Args:
+        session_context: Path to session context directory
+        stage_name: Name of stage (parse, batch, classify, aggregate, report)
+        output_files: List of files created by this stage
+        metadata: Additional metadata about the stage completion
+    
+    Returns:
+        Success confirmation
+    """
+    try:
+        from datetime import datetime
+        
+        stage_file = Path(args["session_context"]) / f"stage_{args['stage_name']}_complete.json"
+        
+        state = {
+            "stage": args["stage_name"],
+            "status": "complete",
+            "timestamp": datetime.now().isoformat(),
+            "output_files": args.get("output_files", []),
+            "metadata": args.get("metadata", {})
+        }
+        
+        with open(stage_file, 'w') as f:
+            json.dump(state, f, indent=2)
+        
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": True,
+                    "message": f"Stage {args['stage_name']} marked complete",
+                    "state_file": str(stage_file)
+                }, indent=2)
+            }]
+        }
+    except Exception as e:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e)
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="wait_for_batch_file",
+    description="Wait for a batch classification file to be created by a subagent. Polls for the file with timeout. Use this after spawning a batch-processor subagent.",
+    input_schema={
+        "session_context": str,
+        "batch_number": int,
+        "timeout_seconds": int
+    }
+)
+async def wait_for_batch_file(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Wait for a batch classification file to be created.
+    
+    Args:
+        session_context: Path to session context directory
+        batch_number: Batch number to wait for
+        timeout_seconds: Maximum time to wait (default: 120)
+    
+    Returns:
+        File contents when ready, or timeout error
+    """
+    import asyncio
+    
+    try:
+        batch_file = Path(args["session_context"]) / f"batch_{args['batch_number']}_elements.json"
+        timeout = args.get("timeout_seconds", 120)
+        poll_interval = 5
+        elapsed = 0
+        
+        while elapsed < timeout:
+            if batch_file.exists():
+                # Wait a bit more to ensure file is fully written
+                await asyncio.sleep(2)
+                
+                try:
+                    with open(batch_file, 'r') as f:
+                        data = json.load(f)
+                    
+                    # Validate it's a proper classification output
+                    if isinstance(data, list) and len(data) > 0:
+                        return {
+                            "content": [{
+                                "type": "text",
+                                "text": json.dumps({
+                                    "success": True,
+                                    "batch_number": args["batch_number"],
+                                    "element_count": len(data),
+                                    "file_path": str(batch_file),
+                                    "sample_element": data[0] if data else None
+                                }, indent=2)
+                            }]
+                        }
+                except json.JSONDecodeError:
+                    pass  # File still being written
+            
+            await asyncio.sleep(poll_interval)
+            elapsed += poll_interval
+        
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": f"Timeout waiting for batch {args['batch_number']} after {timeout} seconds",
+                    "expected_file": str(batch_file)
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+    except Exception as e:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e)
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="aggregate_batch_results",
+    description="Combine all batch classification files into a single aggregated file. Validates that all batches are present and have consistent schema. Use this before generating reports.",
+    input_schema={
+        "session_context": str,
+        "total_batches": int,
+        "output_file": str
+    }
+)
+async def aggregate_batch_results(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Aggregate all batch classification results into one file.
+    
+    Args:
+        session_context: Path to session context directory
+        total_batches: Expected number of batches
+        output_file: Path to output aggregated file
+    
+    Returns:
+        Aggregation results with element counts and validation status
+    """
+    try:
+        import glob
+        
+        session_path = Path(args["session_context"])
+        all_elements = []
+        batch_stats = []
+        missing_batches = []
+        validation_errors = []
+        
+        for batch_num in range(1, args["total_batches"] + 1):
+            batch_file = session_path / f"batch_{batch_num}_elements.json"
+            
+            if not batch_file.exists():
+                missing_batches.append(batch_num)
+                continue
+            
+            try:
+                with open(batch_file, 'r') as f:
+                    batch_data = json.load(f)
+                
+                if not isinstance(batch_data, list):
+                    validation_errors.append(f"Batch {batch_num}: not a list")
+                    continue
+                
+                # Validate and normalize field names
+                for elem in batch_data:
+                    # Normalize guid -> global_id
+                    if 'guid' in elem and 'global_id' not in elem:
+                        elem['global_id'] = elem.pop('guid')
+                    
+                    # Validate required fields
+                    required = ['global_id', 'ifc_type']
+                    for field in required:
+                        if field not in elem:
+                            validation_errors.append(f"Batch {batch_num}: missing {field}")
+                
+                all_elements.extend(batch_data)
+                batch_stats.append({
+                    "batch": batch_num,
+                    "elements": len(batch_data)
+                })
+                
+            except json.JSONDecodeError as e:
+                validation_errors.append(f"Batch {batch_num}: invalid JSON - {e}")
+        
+        if missing_batches:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "success": False,
+                        "error": f"Missing batches: {missing_batches}",
+                        "found_batches": [s["batch"] for s in batch_stats]
+                    }, indent=2)
+                }],
+                "is_error": True
+            }
+        
+        # Write aggregated file
+        output_path = Path(args["output_file"])
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        aggregated = {
+            "elements": all_elements,
+            "total_count": len(all_elements),
+            "batch_stats": batch_stats,
+            "validation_warnings": validation_errors if validation_errors else None
+        }
+        
+        with open(output_path, 'w') as f:
+            json.dump(aggregated, f, indent=2)
+        
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": True,
+                    "total_elements": len(all_elements),
+                    "batches_processed": len(batch_stats),
+                    "batch_stats": batch_stats,
+                    "output_file": str(output_path),
+                    "validation_warnings": validation_errors if validation_errors else None
+                }, indent=2)
+            }]
+        }
+        
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="get_workflow_status",
+    description="Get the overall status of the workflow by checking all stage completion files. Useful for resuming interrupted workflows.",
+    input_schema={
+        "session_context": str
+    }
+)
+async def get_workflow_status(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get comprehensive workflow status.
+    
+    Args:
+        session_context: Path to session context directory
+    
+    Returns:
+        Status of all workflow stages and available files
+    """
+    try:
+        import glob
+        
+        session_path = Path(args["session_context"])
+        
+        if not session_path.exists():
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "exists": False,
+                        "message": f"Session context directory does not exist: {session_path}"
+                    }, indent=2)
+                }]
+            }
+        
+        # Check stage completion files
+        stages = ["parse", "batch", "classify", "aggregate", "report"]
+        stage_status = {}
+        
+        for stage in stages:
+            stage_file = session_path / f"stage_{stage}_complete.json"
+            if stage_file.exists():
+                with open(stage_file, 'r') as f:
+                    stage_status[stage] = json.load(f)
+            else:
+                stage_status[stage] = {"status": "not_started"}
+        
+        # Check for data files
+        files = {
+            "parsed_data": (session_path / "parsed_data.json").exists(),
+            "batches": (session_path / "batches.json").exists(),
+            "aggregated": (session_path / "all_classified_elements.json").exists(),
+            "co2_report": (session_path / "co2_report.json").exists()
+        }
+        
+        # Count batch files
+        batch_files = list(session_path.glob("batch_*_elements.json"))
+        files["batch_files_count"] = len(batch_files)
+        files["batch_files"] = [f.name for f in batch_files]
+        
+        # Check for output files
+        output_files = list(session_path.glob("*.xlsx")) + list(session_path.glob("*.pdf"))
+        files["output_files"] = [f.name for f in output_files]
+        
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "session_context": str(session_path),
+                    "stages": stage_status,
+                    "files": files,
+                    "recommendation": _get_workflow_recommendation(stage_status, files)
+                }, indent=2)
+            }]
+        }
+        
+    except Exception as e:
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e)
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+def _get_workflow_recommendation(stages: dict, files: dict) -> str:
+    """Generate a recommendation for the next workflow step."""
+    if stages.get("report", {}).get("status") == "complete":
+        return "Workflow complete. Output files are ready for download."
+    
+    if stages.get("aggregate", {}).get("status") == "complete":
+        return "Run report generation stage."
+    
+    if files.get("batch_files_count", 0) > 0:
+        return f"Found {files['batch_files_count']} batch files. Run aggregate_batch_results to combine them."
+    
+    if stages.get("batch", {}).get("status") == "complete":
+        return "Run classification stage with batch-processor subagents."
+    
+    if stages.get("parse", {}).get("status") == "complete":
+        return "Run batch preparation stage."
+    
+    if files.get("parsed_data"):
+        return "Parsed data exists. Mark parse stage complete and continue."
+    
+    return "Start with parsing the IFC file."
+
+
 def create_ifc_tools_server():
     """
     Create MCP server with all IFC analysis tools.
@@ -686,17 +1224,29 @@ def create_ifc_tools_server():
     - mcp__ifc__prepare_batches
     - mcp__ifc__calculate_co2
     - mcp__ifc__generate_excel_report
+    - mcp__ifc__generate_pdf_report
     - mcp__ifc__generate_presentation
+    - mcp__ifc__check_workflow_stage
+    - mcp__ifc__mark_stage_complete
+    - mcp__ifc__wait_for_batch_file
+    - mcp__ifc__aggregate_batch_results
+    - mcp__ifc__get_workflow_status
     """
     return create_sdk_mcp_server(
         name="ifc",
         version="1.0.0",
         tools=[
-            parse_ifc_file, 
-            prepare_batches, 
+            parse_ifc_file,
+            prepare_batches,
             calculate_co2,
             generate_excel_report,
-            generate_presentation
+            generate_pdf_report,
+            generate_presentation,
+            check_workflow_stage,
+            mark_stage_complete,
+            wait_for_batch_file,
+            aggregate_batch_results,
+            get_workflow_status
         ]
     )
 

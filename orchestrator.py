@@ -192,20 +192,31 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
     """
     # Track the last text response for the final Stop event
     last_text_response = ""
-    
+
+    # Track pending Task calls to match with results and send SubagentEnd
+    pending_tasks = {}  # tool_use_id -> {"agent_type", "agent_id", "description"}
+
     async for message in client.receive_response():
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, TextBlock):
+                    # Determine current active agent (orchestrator or subagent)
+                    current_agent_id = "orchestrator"
+                    if pending_tasks:
+                        # If there are pending tasks, attribute to the most recent subagent
+                        last_task = list(pending_tasks.values())[-1]
+                        current_agent_id = last_task["agent_id"]
+
                     # Model thinking/reasoning - LOG IT
-                    logger.log_model_thinking(block.text, agent_id="orchestrator")
-                    
+                    logger.log_model_thinking(block.text, agent_id=current_agent_id)
+
                     # Track this as the last text response
                     last_text_response = block.text
-                    
+
                     # Also send to dashboard for real-time UI
                     await send_event("AgentThinking", {
                         "thought": block.text,
+                        "agent_id": current_agent_id,
                         "timestamp": datetime.now().isoformat()
                     }, session_id, dashboard_url)
 
@@ -220,18 +231,29 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                     if block.name == "Task":
                         # Subagent spawn - LOG IT
                         agent_type = block.input.get("subagent_type", "unknown")
-                        agent_id = f"{agent_type}_{session_id[:8]}"
+                        agent_id = f"{agent_type}_{session_id[:8]}_{len(pending_tasks)}"
+                        description = block.input.get("description", "")
+
                         logger.log_agent_spawn(
                             agent_type=agent_type,
                             agent_id=agent_id,
-                            prompt=block.input.get("description", "")
+                            prompt=description
                         )
-                        
+
+                        # Track this pending Task to match with result later
+                        tool_use_id = block.id if hasattr(block, 'id') else f"task_{len(pending_tasks)}"
+                        pending_tasks[tool_use_id] = {
+                            "agent_type": agent_type,
+                            "agent_id": agent_id,
+                            "description": description,
+                            "start_time": datetime.now().isoformat()
+                        }
+
                         # Send to dashboard
                         await send_event("SubagentStart", {
                             "agent_type": agent_type,
                             "agent_id": agent_id,
-                            "description": block.input.get("description", ""),
+                            "description": description,
                             "timestamp": datetime.now().isoformat()
                         }, session_id, dashboard_url)
                     else:
@@ -239,8 +261,15 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                         tool_input = block.input or {}
                         thought = _get_tool_description(block.name, tool_input)
 
+                        # Determine current active agent
+                        current_agent_id = "orchestrator"
+                        if pending_tasks:
+                            last_task = list(pending_tasks.values())[-1]
+                            current_agent_id = last_task["agent_id"]
+
                         await send_event("AgentThinking", {
                             "thought": thought,
+                            "agent_id": current_agent_id,
                             "timestamp": datetime.now().isoformat()
                         }, session_id, dashboard_url)
 
@@ -249,17 +278,54 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                     tool_result = block.content if hasattr(block, 'content') else str(block)
                     is_error = block.is_error if hasattr(block, 'is_error') else False
 
-                    logger.log_tool_result(
-                        tool_name="unknown",  # SDK doesn't provide tool name in result
-                        tool_output=tool_result,
-                        success=not is_error,
-                        error=tool_result if is_error else None,
-                        agent_id="orchestrator"
-                    )
+                    # Check if this result is for a pending Task (subagent completion)
+                    tool_use_id = block.tool_use_id if hasattr(block, 'tool_use_id') else None
+                    task_info = None
 
-                    # Only send error results to dashboard (success is implicit)
+                    if tool_use_id and tool_use_id in pending_tasks:
+                        task_info = pending_tasks.pop(tool_use_id)
+                    elif pending_tasks:
+                        # Fallback: match with oldest pending task (FIFO)
+                        oldest_id = next(iter(pending_tasks))
+                        task_info = pending_tasks.pop(oldest_id)
+
+                    if task_info:
+                        # This is a Task completion - send SubagentEnd!
+                        result_summary = str(tool_result)[:200] if len(str(tool_result)) > 200 else str(tool_result)
+
+                        logger.log_agent_response(
+                            agent_id=task_info["agent_id"],
+                            response=result_summary
+                        )
+
+                        await send_event("SubagentEnd", {
+                            "agent_type": task_info["agent_type"],
+                            "agent_id": task_info["agent_id"],
+                            "description": task_info["description"],
+                            "result": result_summary,
+                            "success": not is_error,
+                            "timestamp": datetime.now().isoformat()
+                        }, session_id, dashboard_url)
+
+                        logger.log_tool_result(
+                            tool_name="Task",
+                            tool_output=result_summary,
+                            success=not is_error,
+                            error=result_summary if is_error else None,
+                            agent_id=task_info["agent_id"]
+                        )
+                    else:
+                        # Regular tool result (not a Task)
+                        logger.log_tool_result(
+                            tool_name="unknown",
+                            tool_output=tool_result,
+                            success=not is_error,
+                            error=tool_result if is_error else None,
+                            agent_id="orchestrator"
+                        )
+
+                    # Send error results to dashboard
                     if is_error:
-                        # Truncate long error messages
                         error_msg = str(tool_result)[:200] if len(str(tool_result)) > 200 else str(tool_result)
                         await send_event("AgentThinking", {
                             "thought": f"Error: {error_msg}",
@@ -444,48 +510,133 @@ If the user is asking a follow-up question, answer based on the work already com
 **Session ID**: {session_id}
 {continuation_note}
 
+## ⚠️ CRITICAL WORKFLOW RULES
+
+1. **ONE TASK PER MESSAGE** - When spawning a Task, make ONLY that one tool call, then STOP
+2. **WAIT for Task results** - The Task tool returns the subagent's output. Read it before continuing.
+3. **DELEGATE, don't do** - YOU do NOT classify elements, subagents do
+4. **Sequential Tasks** - Spawn batch 1, wait for result, then spawn batch 2, etc.
+5. **Aggregate after ALL Tasks** - Use `mcp__ifc__aggregate_batch_results` only after all batches complete
+
+## 🚫 FORBIDDEN ACTIONS FOR ORCHESTRATOR
+
+You are the ORCHESTRATOR. You coordinate, you do NOT do the work yourself:
+- ❌ Do NOT make multiple tool calls when spawning a Task
+- ❌ Do NOT read batches.json to classify elements yourself
+- ❌ Do NOT read CLASSIFICATION.md (that's for the batch-processor agent)
+- ❌ Do NOT write batch_N_elements.json (that's the subagent's output)
+- ❌ Do NOT spawn Task and immediately call other tools - WAIT for Task result first
+- ✅ DO spawn ONE Task per message
+- ✅ DO read the Task's return value (it contains completion status)
+- ✅ DO use aggregate_batch_results AFTER all Tasks return
+
+## Workflow Status Tool
+
+Before starting, check workflow status:
+```
+Tool: mcp__ifc__get_workflow_status
+Parameters: {{"session_context": "{session_context}"}}
+```
+
+This shows what stages are complete and recommends next steps.
+
 ## Skill-Based Workflow
 
 For IFC analysis and CO2 calculations, read the skill file:
-**Skill Guide**: {skill_path}
+**Skill Guide**: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/SKILL.md
 
-The skill file contains:
-- Complete workflow steps (Parse → Classify → Calculate → Report)
-- When to use MCP tools vs CLI scripts
-- How to spawn batch-processor agents for parallel classification
-- Output format specifications
+## Correct Batch Processing Workflow
 
-## Quick Reference (from skill)
+### Step 1: Parse
+```
+mcp__ifc__parse_ifc_file(ifc_path, output_path="{session_context}/parsed_data.json")
+```
+
+### Step 2: Prepare Batches
+```
+mcp__ifc__prepare_batches(json_path="{session_context}/parsed_data.json", batch_size=50, output_path="{session_context}/batches.json")
+```
+
+### Step 3: Classify (DELEGATE TO SUBAGENTS!)
+
+⚠️ **YOU DO NOT CLASSIFY** - You spawn agents who do the classification.
+
+🚨 **CRITICAL: ONE TASK AT A TIME!** 🚨
+
+You MUST call ONE Task tool per message, then STOP and WAIT for the result.
+DO NOT make multiple tool calls in the same message when spawning Tasks!
+
+**CORRECT (one task per message):**
+```
+Message 1: Task: batch-processor (batch 1)
+           → STOP, wait for result
+Message 2: Task: batch-processor (batch 2)
+           → STOP, wait for result
+Message 3: ... continue
+```
+
+**WRONG (multiple tasks in one message):**
+```
+Message 1: Task: batch-processor (batch 1)
+           Task: batch-processor (batch 2)  ❌ NO!
+           Read: batches.json              ❌ NO!
+```
+
+**For each batch:**
+```
+Task: batch-processor
+  Prompt: "Classify batch 1. Session: {session_context}/ Batch: 1"
+```
+Then STOP. Do not make any other tool calls in this message.
+Wait for the Task result. It will return a summary like:
+"✅ Batch 1 complete. 50 elements classified. Output: batch_1_elements.json"
+
+Only AFTER receiving this result, continue to the next batch.
+
+**What the subagent does (NOT you):**
+- Reads batches.json
+- Reads CLASSIFICATION.md
+- Classifies elements
+- Writes batch_N_elements.json
+- Returns summary to you
+
+**What YOU do:**
+- Spawn the Task
+- Wait for the result
+- Proceed to next step
+
+**DO NOT** read batches.json, CLASSIFICATION.md, or write batch files yourself!
+
+### Step 4: Aggregate Results (AFTER Tasks Return!)
+After ALL batch-processor Tasks have returned:
+```
+mcp__ifc__aggregate_batch_results(session_context="{session_context}", total_batches=N, output_file="{session_context}/all_classified_elements.json")
+```
+
+### Step 5: Calculate CO2
+Use the aggregated file:
+```
+mcp__ifc__calculate_co2(classified_path="{session_context}/all_classified_elements.json", ...)
+```
+
+### Step 6: Generate Report
+Use the CO2 report file:
+```
+mcp__ifc__generate_excel_report(data_json="{session_context}/co2_report.json", ...)
+```
+
+## Quick Reference
 
 | Step | Tool/Script | Purpose |
 |------|-------------|---------|
 | Parse IFC | `mcp__ifc__parse_ifc_file` | Extract building elements |
-| Prepare Batches | `mcp__ifc__prepare_batches` | Split for parallel processing |
+| Prepare Batches | `mcp__ifc__prepare_batches` | Split for processing |
 | Classify | Task agents (batch-processor) | Material classification |
+| **Aggregate** | `mcp__ifc__aggregate_batch_results` | Combine batch results |
 | Calculate CO2 | `mcp__ifc__calculate_co2` | CO2 impact calculation |
-| Generate PDF | `python scripts/generate_pdf.py` | Create report |
-| **Generate Excel** | `mcp__ifc__generate_excel_report` | Create Excel spreadsheet |
-| **Generate PPTX** | `mcp__ifc__generate_presentation` | Create PowerPoint presentation |
-
-## Excel & PowerPoint Skills
-
-You have access to Claude's built-in document generation skills:
-
-- **Excel Reports**: Use `mcp__ifc__generate_excel_report` to create formatted Excel spreadsheets with data analysis, charts, and proper formatting. Great for:
-  - Material quantity takeoffs
-  - CO2 analysis summaries
-  - Element inventories
-  - Cost breakdowns
-
-- **PowerPoint Presentations**: Use `mcp__ifc__generate_presentation` to create professional presentations with slides and visualizations. Great for:
-  - Analysis summaries for stakeholders
-  - Project reports
-  - Sustainability assessments
-
-Both tools accept:
-- `prompt`: Description of what to create
-- `output_dir`: Where to save the file (use {session_context}/)
-- `data_json`: Optional JSON data to include in the document
+| Generate PDF | `mcp__ifc__generate_pdf_report` | Create PDF report (ReportLab) |
+| Generate Excel | `mcp__ifc__generate_excel_report` | Create Excel spreadsheet |
+| Generate PPTX | `mcp__ifc__generate_presentation` | Create PowerPoint |
 
 ## Session Context
 
@@ -493,8 +644,9 @@ All intermediate files go in: {session_context}/
 - parsed_data.json
 - batches.json
 - batch_N_elements.json (per batch)
+- all_classified_elements.json (aggregated)
 - co2_report.json
-- co2_report.pdf
+- report.xlsx / report.pdf
 
 ## Important Paths
 
@@ -502,7 +654,14 @@ All intermediate files go in: {session_context}/
 - Reference data: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/
 - Database: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/durability_database.json
 
-Read the skill file for detailed guidance. Coordinate agents efficiently.
+**REMEMBER: You are the ORCHESTRATOR, not the WORKER.**
+- ONE Task per message - spawn a Task, then STOP
+- WAIT for Task result before making any other tool calls
+- Read the Task's return message (e.g., "✅ Batch 1 complete")
+- Only AFTER receiving the result, spawn the next Task
+- Never classify elements yourself
+- Never write batch files yourself
+- Use aggregate_batch_results AFTER all Tasks complete
 """
 
             # Log the orchestrator prompt - FULL VISIBILITY

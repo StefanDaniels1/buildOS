@@ -1,7 +1,8 @@
 ---
 name: durability-calculator
-description: Calculates CO2 impact for classified building elements using skill-based methodology.
-tools: Read, Write
+description: MUST BE USED after all batches are classified and aggregated. Use for CO2 impact calculation using NIBE database. Required before generating reports.
+tools: Read, Write, mcp__ifc__calculate_co2
+model: haiku
 ---
 
 # Durability Calculator Agent

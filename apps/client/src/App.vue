@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useWebSocket } from './composables/useWebSocket';
 import { useTheme } from './composables/useTheme';
-import LiveChart from './components/LiveChart.vue';
+import AgentFlowTree from './components/AgentFlowTree.vue';
 import ChatWindow from './components/ChatWindow.vue';
 import EventTimeline from './components/EventTimeline.vue';
 import SessionFilter from './components/SessionFilter.vue';
@@ -122,6 +122,20 @@ function handleFileUploaded(file: {name: string, path: string, absolutePath: str
   // Add to uploaded files array so it's available to orchestrator
   uploadedFiles.value.push(file);
   console.log('✅ App.vue: File added via ChatWindow:', file, 'Total files:', uploadedFiles.value.length);
+}
+
+// Handle clicks on agent flow tree nodes - scroll to event in timeline
+function handleFlowNodeClick(eventId: string) {
+  // Find the event element in the DOM and scroll to it
+  const eventElement = document.querySelector(`[data-event-id="${eventId}"]`);
+  if (eventElement) {
+    eventElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Add a highlight effect
+    eventElement.classList.add('ring-2', 'ring-buildos-primary', 'ring-opacity-50');
+    setTimeout(() => {
+      eventElement.classList.remove('ring-2', 'ring-buildos-primary', 'ring-opacity-50');
+    }, 2000);
+  }
 }
 
 // Extract downloadable file paths from message content
@@ -504,17 +518,20 @@ function toggleRight() {
         </template>
       </aside>
 
-      <!-- Center: Chart, Content Area, and Chat -->
+      <!-- Center: Agent Flow, Content Area, and Chat -->
       <div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
-        <!-- Chart (always visible) -->
-        <LiveChart :events="events" />
+        <!-- Agent Flow Tree (always visible) -->
+        <AgentFlowTree 
+          :events="displayedEvents" 
+          @nodeClick="handleFlowNodeClick"
+        />
 
         <!-- Content area - Toggle between Chat Messages and 3D Viewer -->
         <div class="flex-1 min-h-0 relative">
           <!-- Chat Messages View (scrollable history) -->
           <div v-show="viewMode === 'chat'" class="absolute inset-0 overflow-y-auto p-3 space-y-3 theme-surface rounded-lg">
             <!-- Session events -->
-            <div v-for="event in displayedEvents" :key="event.id" class="text-sm">
+            <div v-for="event in displayedEvents" :key="event.id" :data-event-id="event.id" class="text-sm transition-all duration-300">
               <!-- User message -->
               <div v-if="event.hook_event_type === 'UserPromptSubmit'" class="flex justify-end">
                 <div class="bg-buildos-primary text-white rounded-lg px-3 py-2 max-w-[80%]">

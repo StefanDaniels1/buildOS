@@ -14,20 +14,48 @@
   "mcp_servers": {
     "ifc": {
       "description": "IFC analysis tools for buildOS",
-      "tools": ["parse_ifc_file", "prepare_batches", "calculate_co2"]
+      "tools": [
+        "parse_ifc_file",
+        "prepare_batches",
+        "calculate_co2",
+        "aggregate_batch_results",
+        "generate_excel_report",
+        "generate_pdf_report",
+        "generate_presentation",
+        "get_workflow_status",
+        "wait_for_batch_file"
+      ]
     }
   },
   "skills": {
     "ifc-analysis": {
       "name": "IFC CO2 Analysis",
-      "description": "Analyze IFC building models for CO2 emissions. Parses IFC files, classifies materials, calculates embodied carbon using Dutch NIBE database, and generates PDF reports.",
+      "description": "Analyze IFC building models for CO2 emissions. Parses IFC files, classifies materials, calculates embodied carbon using Dutch NIBE database, and generates reports.",
       "path": ".claude/skills/ifc-analysis/SKILL.md",
       "triggers": [
         "ifc", "co2", "carbon", "emissions", "sustainability",
         "nibe", "mpg", "environmental impact", "building analysis"
       ],
-      "agents": ["batch-processor"],
-      "tools": ["mcp__ifc__*"]
+      "agents": {
+        "data-prep": {
+          "role": "preparation",
+          "description": "MUST BE USED when starting IFC analysis. Parses IFC files and creates classification batches."
+        },
+        "batch-processor": {
+          "role": "classification",
+          "description": "MUST BE USED for classifying building elements. Spawned IN PARALLEL for each batch.",
+          "parallel": true
+        },
+        "durability-calculator": {
+          "role": "calculation",
+          "description": "MUST BE USED after all batches are classified. Calculates CO2 impact using NIBE database."
+        }
+      },
+      "tools": ["mcp__ifc__*"],
+      "workflow": {
+        "phases": ["parse", "batch", "classify", "aggregate", "calculate", "report"],
+        "parallel_phase": "classify"
+      }
     }
   }
 }

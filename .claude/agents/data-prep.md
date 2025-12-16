@@ -1,7 +1,7 @@
 ---
 name: data-prep
-description: Parses IFC files and prepares classification batches using skill-based workflow.
-tools: Read, Bash
+description: MUST BE USED when starting IFC analysis. Use FIRST to parse IFC files and create classification batches. Required before spawning batch-processor agents.
+tools: Read, Bash, mcp__ifc__parse_ifc_file, mcp__ifc__prepare_batches
 ---
 
 # Data Preparation Agent
