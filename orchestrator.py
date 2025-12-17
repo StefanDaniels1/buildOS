@@ -194,18 +194,18 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
     last_text_response = ""
 
     # Track pending Task calls to match with results and send SubagentEnd
-    pending_tasks = {}  # tool_use_id -> {"agent_type", "agent_id", "description"}
+    pending_tasks = {}  # tool_use_id -> {"agent_type", "agent_id", "description", "is_background"}
+
+    # Track which agent is currently "active" (for synchronous tasks only)
+    # Background tasks don't change the active agent
+    active_agent_id = "orchestrator"
 
     async for message in client.receive_response():
         if isinstance(message, AssistantMessage):
             for block in message.content:
                 if isinstance(block, TextBlock):
-                    # Determine current active agent (orchestrator or subagent)
-                    current_agent_id = "orchestrator"
-                    if pending_tasks:
-                        # If there are pending tasks, attribute to the most recent subagent
-                        last_task = list(pending_tasks.values())[-1]
-                        current_agent_id = last_task["agent_id"]
+                    # Use the active agent (only changes for synchronous tasks)
+                    current_agent_id = active_agent_id
 
                     # Model thinking/reasoning - LOG IT
                     logger.log_model_thinking(block.text, agent_id=current_agent_id)
@@ -233,6 +233,7 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                         agent_type = block.input.get("subagent_type", "unknown")
                         agent_id = f"{agent_type}_{session_id[:8]}_{len(pending_tasks)}"
                         description = block.input.get("description", "")
+                        is_background = block.input.get("run_in_background", False)
 
                         logger.log_agent_spawn(
                             agent_type=agent_type,
@@ -246,14 +247,21 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                             "agent_type": agent_type,
                             "agent_id": agent_id,
                             "description": description,
-                            "start_time": datetime.now().isoformat()
+                            "start_time": datetime.now().isoformat(),
+                            "is_background": is_background
                         }
+
+                        # Only change active agent for synchronous (non-background) tasks
+                        # Background tasks run in parallel and don't take over the main flow
+                        if not is_background:
+                            active_agent_id = agent_id
 
                         # Send to dashboard
                         await send_event("SubagentStart", {
                             "agent_type": agent_type,
                             "agent_id": agent_id,
                             "description": description,
+                            "is_background": is_background,
                             "timestamp": datetime.now().isoformat()
                         }, session_id, dashboard_url)
                     else:
@@ -261,15 +269,10 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                         tool_input = block.input or {}
                         thought = _get_tool_description(block.name, tool_input)
 
-                        # Determine current active agent
-                        current_agent_id = "orchestrator"
-                        if pending_tasks:
-                            last_task = list(pending_tasks.values())[-1]
-                            current_agent_id = last_task["agent_id"]
-
+                        # Use active agent (orchestrator for background tasks, subagent for sync tasks)
                         await send_event("AgentThinking", {
                             "thought": thought,
-                            "agent_id": current_agent_id,
+                            "agent_id": active_agent_id,
                             "timestamp": datetime.now().isoformat()
                         }, session_id, dashboard_url)
 
@@ -314,6 +317,10 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                             error=result_summary if is_error else None,
                             agent_id=task_info["agent_id"]
                         )
+
+                        # Reset active agent to orchestrator when a synchronous task completes
+                        if not task_info.get("is_background", False) and active_agent_id == task_info["agent_id"]:
+                            active_agent_id = "orchestrator"
                     else:
                         # Regular tool result (not a Task)
                         logger.log_tool_result(
@@ -436,11 +443,15 @@ async def run_orchestrator(
 
         filename = ifc_path.stem
 
-        # Create session context folder
-        session_context = workspace / ".context" / f"{filename}_{session_id[:8]}"
+        # Create session context folder with unique identifier
+        # Extract the unique part after "session_" prefix (timestamp + random)
+        unique_part = session_id.split('_', 1)[1] if '_' in session_id else session_id[:16]
+        session_context = workspace / ".context" / f"{filename}_{unique_part[:12]}"
         session_context.mkdir(parents=True, exist_ok=True)
     else:
-        session_context = workspace / ".context" / f"session_{session_id[:8]}"
+        # Extract unique part for session-based context
+        unique_part = session_id.split('_', 1)[1] if '_' in session_id else session_id[:16]
+        session_context = workspace / ".context" / f"session_{unique_part[:12]}"
         session_context.mkdir(parents=True, exist_ok=True)
         filename = "unknown"
 
@@ -512,22 +523,20 @@ If the user is asking a follow-up question, answer based on the work already com
 
 ## ⚠️ CRITICAL WORKFLOW RULES
 
-1. **ONE TASK PER MESSAGE** - When spawning a Task, make ONLY that one tool call, then STOP
-2. **WAIT for Task results** - The Task tool returns the subagent's output. Read it before continuing.
-3. **DELEGATE, don't do** - YOU do NOT classify elements, subagents do
-4. **Sequential Tasks** - Spawn batch 1, wait for result, then spawn batch 2, etc.
-5. **Aggregate after ALL Tasks** - Use `mcp__ifc__aggregate_batch_results` only after all batches complete
+1. **PARALLEL BATCH PROCESSING** - Spawn ALL batch Tasks in a SINGLE message for parallel execution
+2. **DELEGATE, don't do** - YOU do NOT classify elements, subagents do
+3. **Wait for ALL Tasks** - After spawning parallel Tasks, wait for all results before aggregating
+4. **Aggregate after ALL Tasks** - Use `mcp__ifc__aggregate_batch_results` only after all batches complete
 
 ## 🚫 FORBIDDEN ACTIONS FOR ORCHESTRATOR
 
 You are the ORCHESTRATOR. You coordinate, you do NOT do the work yourself:
-- ❌ Do NOT make multiple tool calls when spawning a Task
 - ❌ Do NOT read batches.json to classify elements yourself
 - ❌ Do NOT read CLASSIFICATION.md (that's for the batch-processor agent)
 - ❌ Do NOT write batch_N_elements.json (that's the subagent's output)
-- ❌ Do NOT spawn Task and immediately call other tools - WAIT for Task result first
-- ✅ DO spawn ONE Task per message
-- ✅ DO read the Task's return value (it contains completion status)
+- ❌ Do NOT classify elements yourself - ALWAYS delegate to batch-processor
+- ✅ DO spawn ALL batch Tasks in PARALLEL (one message, multiple Task calls)
+- ✅ DO wait for all Task results before proceeding
 - ✅ DO use aggregate_batch_results AFTER all Tasks return
 
 ## Workflow Status Tool
@@ -557,53 +566,57 @@ mcp__ifc__parse_ifc_file(ifc_path, output_path="{session_context}/parsed_data.js
 mcp__ifc__prepare_batches(json_path="{session_context}/parsed_data.json", batch_size=50, output_path="{session_context}/batches.json")
 ```
 
-### Step 3: Classify (DELEGATE TO SUBAGENTS!)
+### Step 3: Classify (DELEGATE TO SUBAGENTS IN PARALLEL!)
 
 ⚠️ **YOU DO NOT CLASSIFY** - You spawn agents who do the classification.
 
-🚨 **CRITICAL: ONE TASK AT A TIME!** 🚨
+🚀 **PARALLEL EXECUTION - SPAWN ALL BATCHES AT ONCE!** 🚀
 
-You MUST call ONE Task tool per message, then STOP and WAIT for the result.
-DO NOT make multiple tool calls in the same message when spawning Tasks!
+Spawn ALL batch-processor Tasks in a SINGLE message for maximum parallelism.
+This is REQUIRED for efficient processing and proper visualization.
 
-**CORRECT (one task per message):**
+**CORRECT (all tasks in one message - PARALLEL):**
 ```
-Message 1: Task: batch-processor (batch 1)
-           → STOP, wait for result
-Message 2: Task: batch-processor (batch 2)
-           → STOP, wait for result
-Message 3: ... continue
-```
-
-**WRONG (multiple tasks in one message):**
-```
-Message 1: Task: batch-processor (batch 1)
-           Task: batch-processor (batch 2)  ❌ NO!
-           Read: batches.json              ❌ NO!
+Task: batch-processor (batch 1)
+Task: batch-processor (batch 2)
+Task: batch-processor (batch 3)
+Task: batch-processor (batch 4)
+→ All run in PARALLEL, results come back together
 ```
 
-**For each batch:**
+**WRONG (sequential - too slow):**
+```
+Message 1: Task: batch-processor (batch 1) → wait
+Message 2: Task: batch-processor (batch 2) → wait
+... this is INEFFICIENT!
+```
+
+**Spawn ALL batches like this (in ONE message):**
 ```
 Task: batch-processor
-  Prompt: "Classify batch 1. Session: {session_context}/ Batch: 1"
+  subagent_type: "batch-processor"
+  description: "Classify batch 1"
+  prompt: "Classify batch 1. Session: {session_context}/ Batch: 1"
+
+Task: batch-processor
+  subagent_type: "batch-processor"
+  description: "Classify batch 2"
+  prompt: "Classify batch 2. Session: {session_context}/ Batch: 2"
+
+... (continue for all batches)
 ```
-Then STOP. Do not make any other tool calls in this message.
-Wait for the Task result. It will return a summary like:
-"✅ Batch 1 complete. 50 elements classified. Output: batch_1_elements.json"
 
-Only AFTER receiving this result, continue to the next batch.
-
-**What the subagent does (NOT you):**
+**What each subagent does (NOT you):**
 - Reads batches.json
 - Reads CLASSIFICATION.md
-- Classifies elements
+- Classifies its assigned batch
 - Writes batch_N_elements.json
-- Returns summary to you
+- Returns summary
 
 **What YOU do:**
-- Spawn the Task
-- Wait for the result
-- Proceed to next step
+- Spawn ALL batch Tasks in ONE message (parallel)
+- Wait for ALL results to come back
+- Then proceed to aggregation
 
 **DO NOT** read batches.json, CLASSIFICATION.md, or write batch files yourself!
 
@@ -655,10 +668,9 @@ All intermediate files go in: {session_context}/
 - Database: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/durability_database.json
 
 **REMEMBER: You are the ORCHESTRATOR, not the WORKER.**
-- ONE Task per message - spawn a Task, then STOP
-- WAIT for Task result before making any other tool calls
-- Read the Task's return message (e.g., "✅ Batch 1 complete")
-- Only AFTER receiving the result, spawn the next Task
+- SPAWN ALL batch Tasks in PARALLEL (one message, multiple Task calls)
+- WAIT for ALL Task results before proceeding to aggregation
+- Read each Task's return message (e.g., "✅ Batch 1 complete")
 - Never classify elements yourself
 - Never write batch files yourself
 - Use aggregate_batch_results AFTER all Tasks complete

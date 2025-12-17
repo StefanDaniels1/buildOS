@@ -355,12 +355,24 @@ async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
                 )
                 
                 if result["success"] and result["files"]:
+                    # Generate download URLs for Skills API files
+                    download_urls = []
+                    for f in result["files"]:
+                        f_str = str(f)
+                        if f_str.startswith("/app/"):
+                            download_path = f_str[5:]
+                        else:
+                            download_path = f_str
+                        url = f"/workspace/{download_path.replace('workspace/', '')}" if download_path.startswith("workspace/") else f"/{download_path}"
+                        download_urls.append(url)
+
                     return {
                         "content": [{
                             "type": "text",
                             "text": json.dumps({
                                 "success": True,
                                 "files": result["files"],
+                                "download_urls": download_urls,
                                 "response": result["response"][:500] if result["response"] else "",
                                 "method": "claude_skills_api"
                             }, indent=2)
@@ -501,14 +513,23 @@ async def _generate_excel_with_openpyxl(args: Dict[str, Any], data_str: str) -> 
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         output_file = output_dir / f"report_{timestamp}.xlsx"
         wb.save(str(output_file))
-        
+
+        # Generate download URL (strip /app prefix, use /workspace route)
+        output_str = str(output_file)
+        if output_str.startswith("/app/"):
+            download_path = output_str[5:]  # Remove "/app/" prefix
+        else:
+            download_path = output_str
+        download_url = f"/workspace/{download_path.replace('workspace/', '')}" if download_path.startswith("workspace/") else f"/{download_path}"
+
         return {
             "content": [{
                 "type": "text",
                 "text": json.dumps({
                     "success": True,
                     "files": [str(output_file)],
-                    "response": f"Excel file created using openpyxl: {output_file}",
+                    "download_url": download_url,
+                    "response": f"Excel file created. Download: {download_url}",
                     "method": "openpyxl_fallback"
                 }, indent=2)
             }]
@@ -741,15 +762,24 @@ async def generate_pdf_report(args: Dict[str, Any]) -> Dict[str, Any]:
             output_pdf=str(output_path)
         )
 
+        # Generate download URL (strip /app prefix, use /workspace route)
+        output_str = str(output_path)
+        if output_str.startswith("/app/"):
+            download_path = output_str[5:]  # Remove "/app/" prefix
+        else:
+            download_path = output_str
+        download_url = f"/workspace/{download_path.replace('workspace/', '')}" if download_path.startswith("workspace/") else f"/{download_path}"
+
         return {
             "content": [{
                 "type": "text",
                 "text": json.dumps({
                     "success": True,
                     "pdf_file": str(output_path),
+                    "download_url": download_url,
                     "total_co2_kg": result.get("total_co2_kg"),
                     "completeness_pct": result.get("completeness_pct"),
-                    "message": f"PDF report generated: {output_path}"
+                    "message": f"PDF report generated. Download: {download_url}"
                 }, indent=2)
             }]
         }
