@@ -193,8 +193,16 @@ body {
   color: var(--buildos-text);
 }
 
+/* Only apply dark text to white text in general containers, not buttons */
 .light .text-white {
   color: var(--buildos-text);
+}
+
+/* IMPORTANT: Ensure buttons with primary background always have white text */
+.light .bg-buildos-primary.text-white,
+.light .bg-buildos-primary .text-white,
+.light .btn-primary {
+  color: white !important;
 }
 
 .light .bg-gray-700 {

@@ -2,7 +2,7 @@ import { ref, watch, onMounted } from 'vue';
 
 export type Theme = 'light' | 'dark';
 
-const theme = ref<Theme>('dark');
+const theme = ref<Theme>('light');
 
 export function useTheme() {
   const initTheme = () => {
@@ -11,9 +11,8 @@ export function useTheme() {
     if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
       theme.value = savedTheme;
     } else {
-      // Check system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      theme.value = prefersDark ? 'dark' : 'light';
+      // Default to light mode (don't check system preference)
+      theme.value = 'light';
     }
     applyTheme();
   };

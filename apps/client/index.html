@@ -1,14 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BIM AI - CO2 Analysis</title>
     <script>
-      // Prevent flash of wrong theme
-      const theme = localStorage.getItem('theme') || 
-        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      // Prevent flash of wrong theme - default to light
+      const theme = localStorage.getItem('theme') || 'light';
       document.documentElement.classList.remove('dark', 'light');
       document.documentElement.classList.add(theme);
     </script>
