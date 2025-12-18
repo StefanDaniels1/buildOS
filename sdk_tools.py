@@ -463,43 +463,76 @@ async def _generate_excel_with_openpyxl(args: Dict[str, Any], data_str: str) -> 
                 ws[f'A{row}'] = "By Category"
                 ws[f'A{row}'].font = title_font
                 row += 1
-                
-                headers = ["Category", "Count", "CO2 (kg)", "Mass (kg)", "Percentage"]
+
+                # Determine available columns from first category
+                first_cat = next(iter(data['by_category'].values()), {})
+                has_mass = 'mass_kg' in first_cat
+                has_volume = 'volume_m3' in first_cat
+
+                headers = ["Category", "Count", "CO2 (kg)"]
+                if has_mass:
+                    headers.append("Mass (kg)")
+                if has_volume:
+                    headers.append("Volume (m³)")
+                headers.append("Percentage")
+
                 for col, header in enumerate(headers, 1):
                     cell = ws.cell(row=row, column=col)
                     cell.value = header
                     cell.font = header_font
                     cell.fill = header_fill
                 row += 1
-                
+
                 for category, details in data['by_category'].items():
-                    ws.cell(row=row, column=1).value = category
-                    ws.cell(row=row, column=2).value = details.get('count', 0)
-                    ws.cell(row=row, column=3).value = details.get('co2_kg', 0)
-                    ws.cell(row=row, column=4).value = details.get('mass_kg', 0)
-                    ws.cell(row=row, column=5).value = details.get('percentage', 0)
+                    col = 1
+                    ws.cell(row=row, column=col).value = category.replace('_', ' ').title()
+                    col += 1
+                    ws.cell(row=row, column=col).value = details.get('count', 0)
+                    col += 1
+                    ws.cell(row=row, column=col).value = details.get('co2_kg', 0)
+                    col += 1
+                    if has_mass:
+                        ws.cell(row=row, column=col).value = details.get('mass_kg', 0)
+                        col += 1
+                    if has_volume:
+                        ws.cell(row=row, column=col).value = details.get('volume_m3', 0)
+                        col += 1
+                    ws.cell(row=row, column=col).value = details.get('percentage', 0)
                     row += 1
                 row += 1
             
-            # Handle detailed_results
-            if 'detailed_results' in data and data['detailed_results']:
-                ws[f'A{row}'] = "Detailed Results"
+            # Handle detailed_results OR elements (CO2 reports use 'elements')
+            results_key = 'detailed_results' if 'detailed_results' in data else 'elements'
+            if results_key in data and data[results_key]:
+                ws[f'A{row}'] = "Detailed Results" if results_key == 'detailed_results' else "Elements"
                 ws[f'A{row}'].font = title_font
                 row += 1
-                
-                # Get headers from first item
-                first_item = data['detailed_results'][0]
-                headers = list(first_item.keys())
+
+                # Get headers from first item, prioritize important columns
+                first_item = data[results_key][0]
+                all_keys = list(first_item.keys())
+
+                # Prioritize these columns for BIM data
+                priority_keys = ['name', 'ifc_type', 'element_type', 'material_primary',
+                                'volume_m3', 'co2_kg', 'mass_kg', 'confidence', 'global_id']
+                headers = [k for k in priority_keys if k in all_keys]
+                headers.extend([k for k in all_keys if k not in headers and k not in ['reasoning']])
+                headers = headers[:12]  # Limit to 12 columns
+
                 for col, header in enumerate(headers, 1):
                     cell = ws.cell(row=row, column=col)
                     cell.value = header.replace('_', ' ').title()
                     cell.font = header_font
                     cell.fill = header_fill
                 row += 1
-                
-                for item in data['detailed_results']:
+
+                for item in data[results_key]:
                     for col, key in enumerate(headers, 1):
-                        ws.cell(row=row, column=col).value = item.get(key, '')
+                        value = item.get(key, '')
+                        # Handle nested dicts (like material_primary)
+                        if isinstance(value, dict):
+                            value = value.get('category', str(value))
+                        ws.cell(row=row, column=col).value = str(value) if value is not None else ''
                     row += 1
         
         # Adjust column widths
