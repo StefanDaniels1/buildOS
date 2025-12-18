@@ -513,8 +513,7 @@ function toggleRight() {
     <!-- Header -->
     <header class="gradient-header px-6 py-4 flex items-center justify-between shadow-lg">
       <div class="flex items-center gap-4">
-        <h1 class="text-xl font-bold text-white">buildOS Dashboard</h1>
-        <span class="text-xs text-white/70">Multi-Agent Observability</span>
+        <img :src="BimaiLogo" alt="BIM AI" class="h-12" />
       </div>
 
       <div class="flex items-center gap-6">

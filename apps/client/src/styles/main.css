@@ -97,7 +97,7 @@ body {
 
 /* Utility classes */
 .gradient-header {
-  background: linear-gradient(135deg, var(--buildos-primary), var(--buildos-secondary));
+  background: linear-gradient(to right, #8DD4EF, #0696D7);
 }
 
 .card {
