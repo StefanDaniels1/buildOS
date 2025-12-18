@@ -10,6 +10,7 @@ const props = defineProps<{
   compact?: boolean; // New prop for compact mode (input only)
   availableFiles?: Array<{ name: string; path: string; absolutePath: string; timestamp: number }>; // All uploaded files
   apiKey?: string; // User-provided Anthropic API key
+  userId?: string; // User ID derived from API key hash (for session isolation)
   currentSessionId?: string | null; // Session ID from parent to continue conversation
   isNewSession?: boolean; // Flag to indicate a new session should be created
 }>();
@@ -111,7 +112,8 @@ async function sendMessage() {
     session_id: activeSessionId,
     file_path: uploadedFile.value?.absolutePath,
     available_files: props.availableFiles?.map(f => f.absolutePath) || [],
-    api_key: props.apiKey || undefined
+    api_key: props.apiKey || undefined,
+    user_id: props.userId || undefined // User ID for session isolation
   };
 
   try {

@@ -178,15 +178,16 @@ const server = Bun.serve({
     if (url.pathname === '/api/chat' && req.method === 'POST') {
       try {
         const body: ChatRequest = await req.json();
-        const { message, session_id, file_path, available_files, api_key } = body;
-        
-        // DEBUG: Log received request
+        const { message, session_id, file_path, available_files, api_key, user_id } = body;
+
+        // DEBUG: Log received request (never log actual API key)
         console.log('📨 /api/chat received:', {
           message: message?.substring(0, 50),
           session_id,
           file_path,
           available_files_count: available_files?.length || 0,
-          has_api_key: !!api_key
+          has_api_key: !!api_key,
+          user_id: user_id || 'none'
         });
 
         if (!message || !session_id) {
@@ -199,20 +200,44 @@ const server = Bun.serve({
           });
         }
 
-        // Check for API key - either from request or environment
-        const anthropicApiKey = api_key || process.env.ANTHROPIC_API_KEY;
-        if (!anthropicApiKey) {
+        // SECURITY: Require user_id for session isolation
+        if (!user_id || user_id.length < 8) {
           return new Response(JSON.stringify({
             success: false,
-            error: 'API key required. Please enter your Anthropic API key in settings.'
+            error: 'User identification required. Please refresh the page and enter your API key.'
           }), {
             status: 401,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           });
         }
 
-        // Trigger orchestrator in background with available files and API key
-        triggerOrchestrator(message, session_id, file_path, available_files, anthropicApiKey).catch((err: Error) => {
+        // SECURITY: Only use user-provided API key - never fall back to server key
+        // This ensures each user pays for their own usage and keys stay isolated
+        if (!api_key) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'API key required. Please click "Set API Key" and enter your Anthropic API key. Get one at console.anthropic.com'
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Validate API key format (basic check)
+        if (!api_key.startsWith('sk-ant-')) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Invalid API key format. Anthropic keys start with "sk-ant-"'
+          }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const anthropicApiKey = api_key;
+
+        // Trigger orchestrator in background with user_id for session isolation
+        triggerOrchestrator(message, session_id, file_path, available_files, anthropicApiKey, user_id).catch((err: Error) => {
           console.error('Orchestrator error:', err);
         });
 
@@ -427,10 +452,30 @@ const server = Bun.serve({
     }
 
     // GET /workspace/* - Serve workspace files (generated reports, etc.)
+    // SECURITY: Files are isolated by user_id in path: .context/{user_id}/session_xxx/
     if (url.pathname.startsWith('/workspace/') && req.method === 'GET') {
       try {
         const relativePath = url.pathname.replace('/workspace/', '');
-        
+
+        // SECURITY: Prevent path traversal attacks
+        if (relativePath.includes('..') || relativePath.includes('//')) {
+          console.warn('Security: Blocked path traversal attempt:', relativePath);
+          return new Response(JSON.stringify({ error: 'Invalid path' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // SECURITY: Only allow access to .context/ files (user session data)
+        // or uploads/ (shared uploaded files)
+        if (!relativePath.startsWith('.context/') && !relativePath.startsWith('uploads/')) {
+          console.warn('Security: Blocked access to unauthorized path:', relativePath);
+          return new Response(JSON.stringify({ error: 'Access denied' }), {
+            status: 403,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
         // Use process.cwd() to find workspace directory
         let workspaceDir = process.cwd();
         if (workspaceDir.includes('/apps/server')) {
@@ -440,10 +485,10 @@ const server = Bun.serve({
         } else {
           workspaceDir = workspaceDir + '/workspace';
         }
-        
+
         const filepath = `${workspaceDir}/${relativePath}`;
 
-        console.log('Serving workspace file request:', { pathname: url.pathname, relativePath, workspaceDir, filepath });
+        console.log('Serving workspace file:', { relativePath });
 
         const file = Bun.file(filepath);
         const exists = await file.exists();

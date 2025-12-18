@@ -34,6 +34,7 @@ export interface ChatRequest {
   file_path?: string;
   available_files?: string[]; // List of all available file paths
   api_key?: string; // User-provided Anthropic API key
+  user_id?: string; // User ID derived from API key hash (for session isolation)
 }
 
 export interface ApiResponse<T = unknown> {

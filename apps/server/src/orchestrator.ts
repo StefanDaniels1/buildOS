@@ -14,17 +14,20 @@ import type { HookEvent } from './types';
  * @param sessionId - Unique session identifier
  * @param filePath - Optional path to uploaded file
  * @param availableFiles - Optional list of all available file paths
- * @param apiKey - Anthropic API key (from user or environment)
+ * @param apiKey - Anthropic API key (from user)
+ * @param userId - User ID for session isolation (hash of API key)
  */
 export async function triggerOrchestrator(
   message: string,
   sessionId: string,
   filePath?: string,
   availableFiles?: string[],
-  apiKey?: string
+  apiKey?: string,
+  userId?: string
 ): Promise<void> {
   console.log(`[Orchestrator] ========== STARTING ==========`);
   console.log(`[Orchestrator] Session: ${sessionId}`);
+  console.log(`[Orchestrator] User ID: ${userId || 'none'}`);
   console.log(`[Orchestrator] Message: ${message}`);
   console.log(`[Orchestrator] filePath param:`, filePath);
   console.log(`[Orchestrator] availableFiles param:`, availableFiles);
@@ -95,9 +98,11 @@ export async function triggerOrchestrator(
       env: {
         ...process.env,
         BUILDOS_SESSION_ID: sessionId,
+        BUILDOS_USER_ID: userId || '', // User ID for session isolation
         PYTHONPATH: projectRoot,
-        // Pass API key to orchestrator (user-provided or from environment)
-        ANTHROPIC_API_KEY: apiKey || process.env.ANTHROPIC_API_KEY || ''
+        // SECURITY: Only pass user-provided API key - never use server environment key
+        // This is validated in index.ts before reaching here
+        ANTHROPIC_API_KEY: apiKey || ''
       },
       stdout: 'pipe',
       stderr: 'pipe'

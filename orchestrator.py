@@ -443,15 +443,35 @@ async def run_orchestrator(
 
         filename = ifc_path.stem
 
-        # Create session context folder with unique identifier
-        # Extract the unique part after "session_" prefix (timestamp + random)
+        # Get user_id for session isolation (from environment, set by server)
+        user_id = os.environ.get('BUILDOS_USER_ID', '')
+
+        # Create session context folder with user isolation
+        # Structure: .context/{user_id}/session_{unique_part}/
         unique_part = session_id.split('_', 1)[1] if '_' in session_id else session_id[:16]
-        session_context = workspace / ".context" / f"{filename}_{unique_part[:12]}"
+
+        if user_id:
+            # User-isolated path: .context/{user_id}/session_{timestamp}/
+            session_context = workspace / ".context" / user_id / f"session_{unique_part[:12]}"
+        else:
+            # Fallback for local dev without user_id
+            session_context = workspace / ".context" / f"{filename}_{unique_part[:12]}"
+
         session_context.mkdir(parents=True, exist_ok=True)
     else:
+        # Get user_id for session isolation
+        user_id = os.environ.get('BUILDOS_USER_ID', '')
+
         # Extract unique part for session-based context
         unique_part = session_id.split('_', 1)[1] if '_' in session_id else session_id[:16]
-        session_context = workspace / ".context" / f"session_{unique_part[:12]}"
+
+        if user_id:
+            # User-isolated path
+            session_context = workspace / ".context" / user_id / f"session_{unique_part[:12]}"
+        else:
+            # Fallback
+            session_context = workspace / ".context" / f"session_{unique_part[:12]}"
+
         session_context.mkdir(parents=True, exist_ok=True)
         filename = "unknown"
 

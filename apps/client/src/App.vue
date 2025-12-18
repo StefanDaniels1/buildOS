@@ -9,9 +9,114 @@ import SessionFilter from './components/SessionFilter.vue';
 import IfcViewer from './components/IfcViewer.vue';
 import MarkdownRenderer from './components/MarkdownRenderer.vue';
 import { API_BASE_URL } from './config';
+import BimaiLogo from './BIMAI.svg';
 
 const { events, isConnected, error } = useWebSocket();
 const { theme, toggleTheme } = useTheme();
+
+// Welcome message state
+const hasShownWelcome = ref(false);
+const welcomeSessionId = ref('');
+
+// Generate welcome messages that look like orchestrator events
+// Only show on first visit ever (tracked in localStorage)
+function showWelcomeMessages() {
+  if (hasShownWelcome.value) return;
+
+  // Check if user has seen welcome before
+  const hasSeenWelcome = localStorage.getItem('buildos_welcome_shown');
+  if (hasSeenWelcome) {
+    hasShownWelcome.value = true;
+    return;
+  }
+
+  const sessionId = `welcome_${Date.now()}`;
+  welcomeSessionId.value = sessionId;
+  const baseTime = Date.now();
+
+  // Select the welcome session immediately so messages are visible
+  selectedSession.value = sessionId;
+
+  // Message 1: Thinking - Initializing
+  setTimeout(() => {
+    events.value.push({
+      source_app: 'buildos-orchestrator',
+      session_id: sessionId,
+      hook_event_type: 'AgentThinking',
+      payload: {
+        thought: 'Initializing BIM AI orchestrator...',
+        timestamp: new Date().toISOString()
+      },
+      timestamp: baseTime
+    });
+  }, 300);
+
+  // Message 2: Thinking - Ready
+  setTimeout(() => {
+    events.value.push({
+      source_app: 'buildos-orchestrator',
+      session_id: sessionId,
+      hook_event_type: 'AgentThinking',
+      payload: {
+        thought: 'System ready. Loading capabilities...',
+        timestamp: new Date().toISOString()
+      },
+      timestamp: baseTime + 500
+    });
+  }, 800);
+
+  // Message 3: Thinking - Hello preview
+  setTimeout(() => {
+    events.value.push({
+      source_app: 'buildos-orchestrator',
+      session_id: sessionId,
+      hook_event_type: 'AgentThinking',
+      payload: {
+        thought: "Hello! I'm your BIM AI assistant...",
+        timestamp: new Date().toISOString()
+      },
+      timestamp: baseTime + 1000
+    });
+  }, 1300);
+
+  // Message 4: Complete - Full welcome message
+  setTimeout(() => {
+    events.value.push({
+      source_app: 'buildos-orchestrator',
+      session_id: sessionId,
+      hook_event_type: 'Stop',
+      payload: {
+        status: 'success',
+        message: `Hello! I'm your BIM AI assistant.
+
+I can help you analyze IFC (Industry Foundation Classes) building models and extract valuable insights from your BIM data.
+
+**What I can do:**
+- Parse and analyze IFC files
+- Extract building elements, materials, and quantities
+- Perform various analyses on your building data
+- Generate comprehensive reports (PDF, Excel)
+
+**To get started:**
+1. Upload an IFC file using the upload button below
+2. Tell me what you'd like to analyze
+
+**Example commands:**
+- "Analyze the uploaded building"
+- "List all building elements"
+- "Generate a report"
+
+Upload an IFC file and let me know how I can help!`,
+        timestamp: new Date().toISOString()
+      },
+      timestamp: baseTime + 1500
+    });
+
+    hasShownWelcome.value = true;
+    // Mark that user has seen welcome (persistent)
+    localStorage.setItem('buildos_welcome_shown', 'true');
+  }, 1800);
+}
 
 const selectedSession = ref<string | null>(null);
 const showTimeline = ref(true);
@@ -32,34 +137,104 @@ const viewerRef = ref<InstanceType<typeof IfcViewer> | null>(null);
 // Track all uploaded files (history)
 const uploadedFiles = ref<Array<{ name: string; path: string; absolutePath: string; timestamp: number }>>([]);
 
-// API Key management
+// API Key management & User Identity
 const apiKey = ref('');
-const showApiKeyModal = ref(false);
+const userId = ref('');
+const showApiKeyModal = ref(true); // Start with modal shown
 const apiKeyInput = ref('');
+const apiKeyError = ref('');
+const isValidatingKey = ref(false);
+const isAuthenticated = ref(false); // Only true when valid key is set
 
-// Load API key from localStorage on mount
-onMounted(() => {
+// Generate a user ID from API key using SHA-256 hash (first 16 chars)
+async function generateUserId(key: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(key);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex.substring(0, 16); // First 16 chars = 64 bits of entropy
+}
+
+// Load API key and user ID from localStorage on mount
+onMounted(async () => {
   const savedKey = localStorage.getItem('anthropic_api_key');
-  if (savedKey) {
+  const savedUserId = localStorage.getItem('buildos_user_id');
+
+  if (savedKey && savedUserId && savedKey.startsWith('sk-ant-')) {
     apiKey.value = savedKey;
+    userId.value = savedUserId;
+    isAuthenticated.value = true;
+    showApiKeyModal.value = false;
+    // Show welcome messages after connection established
+    setTimeout(() => showWelcomeMessages(), 800);
+  } else if (savedKey && savedKey.startsWith('sk-ant-')) {
+    // Migrate: generate user ID for existing key
+    apiKey.value = savedKey;
+    userId.value = await generateUserId(savedKey);
+    localStorage.setItem('buildos_user_id', userId.value);
+    isAuthenticated.value = true;
+    showApiKeyModal.value = false;
+    setTimeout(() => showWelcomeMessages(), 800);
+  } else {
+    // No valid API key - force the modal to show
+    showApiKeyModal.value = true;
+    isAuthenticated.value = false;
   }
 });
 
-function saveApiKey() {
-  apiKey.value = apiKeyInput.value.trim();
-  if (apiKey.value) {
-    localStorage.setItem('anthropic_api_key', apiKey.value);
-  } else {
-    localStorage.removeItem('anthropic_api_key');
+async function saveApiKey() {
+  const key = apiKeyInput.value.trim();
+  apiKeyError.value = '';
+
+  if (!key) {
+    apiKeyError.value = 'Please enter your API key';
+    return;
   }
-  showApiKeyModal.value = false;
-  apiKeyInput.value = '';
+
+  // Validate key format
+  if (!key.startsWith('sk-ant-')) {
+    apiKeyError.value = 'Invalid format. Anthropic API keys start with "sk-ant-"';
+    return;
+  }
+
+  if (key.length < 20) {
+    apiKeyError.value = 'API key appears too short. Please check and try again.';
+    return;
+  }
+
+  isValidatingKey.value = true;
+
+  try {
+    apiKey.value = key;
+    userId.value = await generateUserId(key);
+    localStorage.setItem('anthropic_api_key', apiKey.value);
+    localStorage.setItem('buildos_user_id', userId.value);
+    isAuthenticated.value = true;
+    showApiKeyModal.value = false;
+    apiKeyInput.value = '';
+    // Show welcome messages for new login
+    setTimeout(() => showWelcomeMessages(), 500);
+  } catch (err) {
+    apiKeyError.value = 'Error saving API key. Please try again.';
+  } finally {
+    isValidatingKey.value = false;
+  }
 }
 
 function clearApiKey() {
   apiKey.value = '';
+  userId.value = '';
   localStorage.removeItem('anthropic_api_key');
-  showApiKeyModal.value = false;
+  localStorage.removeItem('buildos_user_id');
+  isAuthenticated.value = false;
+  showApiKeyModal.value = true; // Force modal to show again
+}
+
+function openApiKeySettings() {
+  apiKeyInput.value = ''; // Don't pre-fill for security
+  apiKeyError.value = '';
+  showApiKeyModal.value = true;
 }
 
 // Stats
@@ -333,6 +508,8 @@ function toggleRight() {
 
 <template>
   <div class="min-h-screen theme-bg flex flex-col transition-colors duration-300">
+    <!-- Main App (only shown when authenticated) -->
+    <template v-if="isAuthenticated">
     <!-- Header -->
     <header class="gradient-header px-6 py-4 flex items-center justify-between shadow-lg">
       <div class="flex items-center gap-4">
@@ -630,6 +807,7 @@ function toggleRight() {
           :compact="true"
           :available-files="uploadedFiles"
           :api-key="apiKey"
+          :user-id="userId"
           :current-session-id="selectedSession"
           :is-new-session="isNewSession"
           @session-created="handleSessionCreated"
@@ -667,6 +845,7 @@ function toggleRight() {
         </template>
       </aside>
     </main>
+    </template>
 
     <!-- Error toast -->
     <div
@@ -676,57 +855,117 @@ function toggleRight() {
       {{ error }}
     </div>
 
-    <!-- API Key Modal -->
+    <!-- API Key Login Screen (Full screen, mandatory) -->
     <div
-      v-if="showApiKeyModal"
+      v-if="showApiKeyModal && !isAuthenticated"
+      class="fixed inset-0 bg-gradient-to-br from-slate-100 via-white to-slate-100 flex items-center justify-center z-50"
+    >
+      <div class="max-w-md w-full mx-4">
+        <!-- Logo/Brand -->
+        <div class="text-center mb-8">
+          <img :src="BimaiLogo" alt="BIM AI" class="h-20 mx-auto mb-4" />
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white/80 backdrop-blur border border-slate-200 rounded-2xl p-8 shadow-xl">
+          <h2 class="text-xl font-semibold text-slate-800 mb-2">Enter your API Key</h2>
+          <p class="text-slate-500 text-sm mb-6">
+            Your Anthropic API key is used to access Claude AI.
+            Get one at <a href="https://console.anthropic.com/" target="_blank" class="text-blue-600 hover:text-blue-500 underline">console.anthropic.com</a>
+          </p>
+
+          <!-- Error Message -->
+          <div v-if="apiKeyError" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p class="text-red-600 text-sm">{{ apiKeyError }}</p>
+          </div>
+
+          <!-- Input -->
+          <input
+            v-model="apiKeyInput"
+            type="password"
+            placeholder="sk-ant-api03-..."
+            class="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 mb-4"
+            @keyup.enter="saveApiKey"
+            autofocus
+          />
+
+          <!-- Submit Button -->
+          <button
+            @click="saveApiKey"
+            :disabled="isValidatingKey"
+            class="w-full px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-400 font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+            style="color: white;"
+          >
+            <span v-if="isValidatingKey" style="color: white;">Validating...</span>
+            <span v-else style="color: white;">Continue</span>
+          </button>
+
+          <!-- Security Note -->
+          <div class="mt-6 p-3 bg-slate-50 rounded-lg">
+            <p class="text-slate-500 text-xs flex items-start gap-2">
+              <span class="text-green-500">🔒</span>
+              <span>Your API key is stored only in your browser. Each user's sessions are completely isolated.</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <p class="text-center text-slate-400 text-xs mt-6">
+          Powered by Claude AI
+        </p>
+      </div>
+    </div>
+
+    <!-- API Key Settings Modal (when already authenticated) -->
+    <div
+      v-if="showApiKeyModal && isAuthenticated"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click.self="showApiKeyModal = false"
     >
       <div class="theme-surface theme-border border rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-        <h3 class="text-xl font-bold theme-text mb-4">🔑 Anthropic API Key</h3>
-        
-        <p class="theme-text-secondary text-sm mb-4">
-          Enter your Anthropic API key to use the AI features. 
-          Get one at <a href="https://console.anthropic.com/" target="_blank" class="text-buildos-primary hover:underline">console.anthropic.com</a>
-        </p>
+        <h3 class="text-xl font-bold theme-text mb-4">API Key Settings</h3>
 
-        <div v-if="apiKey" class="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <p class="text-green-400 text-sm">✓ API Key is configured</p>
+        <div class="mb-4 p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+          <p class="text-green-400 text-sm">API Key is configured</p>
           <p class="theme-text-muted text-xs mt-1">Key: {{ apiKey.slice(0, 10) }}...{{ apiKey.slice(-4) }}</p>
+          <p class="theme-text-muted text-xs mt-1">User ID: {{ userId }}</p>
         </div>
+
+        <p class="theme-text-secondary text-sm mb-4">
+          Enter a new key to switch accounts, or clear to log out.
+        </p>
 
         <input
           v-model="apiKeyInput"
           type="password"
-          placeholder="sk-ant-api03-..."
+          placeholder="Enter new API key..."
           class="input-field w-full mb-4"
         />
+
+        <div v-if="apiKeyError" class="mb-4 p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
+          <p class="text-red-400 text-sm">{{ apiKeyError }}</p>
+        </div>
 
         <div class="flex gap-3">
           <button
             @click="saveApiKey"
-            class="flex-1 px-4 py-2 bg-buildos-primary hover:bg-buildos-secondary text-white font-medium rounded-lg transition-colors"
+            :disabled="!apiKeyInput"
+            class="flex-1 px-4 py-2 bg-buildos-primary hover:bg-buildos-secondary disabled:opacity-50 text-white font-medium rounded-lg transition-colors"
           >
-            Save Key
+            Update Key
           </button>
           <button
-            v-if="apiKey"
             @click="clearApiKey"
             class="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 font-medium rounded-lg transition-colors"
           >
-            Clear
+            Log Out
           </button>
           <button
             @click="showApiKeyModal = false"
             class="px-4 py-2 theme-surface theme-border border hover:opacity-80 theme-text font-medium rounded-lg transition-colors"
           >
-            Cancel
+            Close
           </button>
         </div>
-
-        <p class="theme-text-muted text-xs mt-4">
-          Your API key is stored locally in your browser and never sent to our servers.
-        </p>
       </div>
     </div>
   </div>
