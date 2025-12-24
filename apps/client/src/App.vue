@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { useWebSocket } from './composables/useWebSocket';
 import { useTheme } from './composables/useTheme';
 import AgentFlowTree from './components/AgentFlowTree.vue';
@@ -8,6 +8,7 @@ import EventTimeline from './components/EventTimeline.vue';
 import SessionFilter from './components/SessionFilter.vue';
 import IfcViewer from './components/IfcViewer.vue';
 import MarkdownRenderer from './components/MarkdownRenderer.vue';
+import ToolsBuilder from './components/ToolsBuilder.vue';
 import { API_BASE_URL } from './config';
 import BimaiLogo from './BIMAI.svg';
 
@@ -126,13 +127,14 @@ const isLeftDragging = ref(false);
 const leftFileInput = ref<HTMLInputElement | null>(null);
 const isNewSession = ref(false); // Flag to track new session creation
 
-// View mode: 'chat' or 'viewer'
-type ViewMode = 'chat' | 'viewer';
+// View mode: 'chat', 'viewer', or 'tools'
+type ViewMode = 'chat' | 'viewer' | 'tools';
 const viewMode = ref<ViewMode>('chat');
 
 // Track uploaded file for viewer
 const uploadedFilePath = ref<string | null>(null);
 const viewerRef = ref<InstanceType<typeof IfcViewer> | null>(null);
+const chatMessagesRef = ref<HTMLElement | null>(null);
 
 // Track all uploaded files (history)
 const uploadedFiles = ref<Array<{ name: string; path: string; absolutePath: string; timestamp: number }>>([]);
@@ -504,6 +506,14 @@ function toggleLeft() {
 function toggleRight() {
   rightCollapsed.value = !rightCollapsed.value;
 }
+
+// Auto-scroll chat messages to bottom when new events arrive
+watch(displayedEvents, async () => {
+  await nextTick();
+  if (chatMessagesRef.value) {
+    chatMessagesRef.value.scrollTop = chatMessagesRef.value.scrollHeight;
+  }
+}, { deep: true });
 </script>
 
 <template>
@@ -517,8 +527,8 @@ function toggleRight() {
       </div>
 
       <div class="flex items-center gap-6">
-        <!-- View Toggle (only show when file is uploaded) -->
-        <div v-if="uploadedFilePath" class="flex items-center gap-2 bg-white/10 rounded-lg p-1">
+        <!-- View Toggle -->
+        <div class="flex items-center gap-2 bg-white/10 rounded-lg p-1">
           <button
             @click="viewMode = 'chat'"
             class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
@@ -529,6 +539,7 @@ function toggleRight() {
             💬 Chat
           </button>
           <button
+            v-if="uploadedFilePath"
             @click="viewMode = 'viewer'"
             class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
             :class="viewMode === 'viewer'
@@ -536,6 +547,15 @@ function toggleRight() {
               : 'text-white/70 hover:text-white'"
           >
             🏗️ 3D Viewer
+          </button>
+          <button
+            @click="viewMode = 'tools'"
+            class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+            :class="viewMode === 'tools'
+              ? 'bg-buildos-primary text-white'
+              : 'text-white/70 hover:text-white'"
+          >
+            🛠️ Tools
           </button>
         </div>
 
@@ -696,16 +716,17 @@ function toggleRight() {
 
       <!-- Center: Agent Flow, Content Area, and Chat -->
       <div class="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
-        <!-- Agent Flow Tree (always visible) -->
-        <AgentFlowTree 
-          :events="displayedEvents" 
+        <!-- Agent Flow Tree (visible in chat/viewer modes) -->
+        <AgentFlowTree
+          v-show="viewMode !== 'tools'"
+          :events="displayedEvents"
           @nodeClick="handleFlowNodeClick"
         />
 
         <!-- Content area - Toggle between Chat Messages and 3D Viewer -->
         <div class="flex-1 min-h-0 relative">
           <!-- Chat Messages View (scrollable history) -->
-          <div v-show="viewMode === 'chat'" class="absolute inset-0 overflow-y-auto p-3 space-y-3 theme-surface rounded-lg">
+          <div ref="chatMessagesRef" v-show="viewMode === 'chat'" class="absolute inset-0 overflow-y-auto p-3 space-y-3 theme-surface rounded-lg">
             <!-- Session events -->
             <div v-for="event in displayedEvents" :key="event.id" :data-event-id="event.id" class="text-sm transition-all duration-300">
               <!-- User message -->
@@ -797,10 +818,16 @@ function toggleRight() {
               @error="handleViewerError"
             />
           </div>
+
+          <!-- Tools Builder -->
+          <div v-show="viewMode === 'tools'" class="absolute inset-0">
+            <ToolsBuilder />
+          </div>
         </div>
 
-        <!-- Chat Input (always visible at bottom) -->
+        <!-- Chat Input (visible in chat/viewer modes) -->
         <ChatWindow
+          v-show="viewMode !== 'tools'"
           :key="chatKey"
           :events="events"
           :compact="true"

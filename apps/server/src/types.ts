@@ -42,3 +42,28 @@ export interface ApiResponse<T = unknown> {
   data?: T;
   error?: string;
 }
+
+// Custom MCP Tools
+export interface CustomTool {
+  id?: number;
+  name: string;              // Tool name (alphanumeric + underscore)
+  description: string;       // Description for Claude context
+  input_schema: Record<string, string>; // Parameter schema {"param": "type"}
+  handler_code: string;      // Python async function code
+  enabled: boolean;          // Toggle for orchestrator
+  env_vars: Record<string, string>; // Environment variables
+  created_at?: number;
+  updated_at?: number;
+}
+
+export interface ToolTestRequest {
+  input: Record<string, unknown>;
+  env_overrides?: Record<string, string>;
+}
+
+export interface ToolTestResult {
+  success: boolean;
+  output?: unknown;
+  error?: string;
+  duration_ms?: number;
+}

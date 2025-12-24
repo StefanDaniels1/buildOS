@@ -10,10 +10,10 @@
  * - WS /stream - WebSocket event streaming
  */
 
-import { initDatabase, getRecentEvents, getFilterOptions, insertEvent, clearEvents } from './db';
+import { initDatabase, getRecentEvents, getFilterOptions, insertEvent, clearEvents, getAllTools, getToolById, createTool, updateTool, deleteTool, toggleTool, getEnabledTools } from './db';
 import { addClient, removeClient, sendInitialEvents, broadcastEvent } from './websocket';
 import { triggerOrchestrator } from './orchestrator';
-import type { HookEvent, ChatRequest, UploadedFile } from './types';
+import type { HookEvent, ChatRequest, UploadedFile, CustomTool } from './types';
 
 // Initialize database
 initDatabase();
@@ -387,6 +387,333 @@ const server = Bun.serve({
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+    }
+
+    // ==================== CUSTOM TOOLS API ====================
+
+    // GET /api/tools - List all custom tools
+    if (url.pathname === '/api/tools' && req.method === 'GET') {
+      try {
+        const tools = getAllTools();
+        return new Response(JSON.stringify({
+          success: true,
+          tools
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error fetching tools:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to fetch tools'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // POST /api/tools - Create new tool
+    if (url.pathname === '/api/tools' && req.method === 'POST') {
+      try {
+        const body = await req.json() as Partial<CustomTool>;
+
+        // Validate required fields
+        if (!body.name || !body.description || !body.handler_code) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Name, description, and handler_code are required'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Validate tool name (alphanumeric + underscore only)
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(body.name)) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Tool name must start with a letter or underscore, and contain only letters, numbers, and underscores'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const tool: CustomTool = {
+          name: body.name,
+          description: body.description,
+          input_schema: body.input_schema || {},
+          handler_code: body.handler_code,
+          enabled: body.enabled ?? true,
+          env_vars: body.env_vars || {}
+        };
+
+        const created = createTool(tool);
+        console.log(`Tool created: ${created.name} (id: ${created.id})`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          tool: created
+        }), {
+          status: 201,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error: any) {
+        console.error('Error creating tool:', error);
+        const message = error?.message?.includes('UNIQUE constraint')
+          ? 'A tool with this name already exists'
+          : 'Failed to create tool';
+        return new Response(JSON.stringify({
+          success: false,
+          error: message
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // GET /api/tools/:id - Get single tool
+    if (url.pathname.match(/^\/api\/tools\/\d+$/) && req.method === 'GET') {
+      try {
+        const id = parseInt(url.pathname.split('/').pop()!);
+        const tool = getToolById(id);
+
+        if (!tool) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Tool not found'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          tool
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error fetching tool:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to fetch tool'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // PUT /api/tools/:id - Update tool
+    if (url.pathname.match(/^\/api\/tools\/\d+$/) && req.method === 'PUT') {
+      try {
+        const id = parseInt(url.pathname.split('/').pop()!);
+        const body = await req.json() as Partial<CustomTool>;
+
+        const updated = updateTool(id, body);
+
+        if (!updated) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Tool not found'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`Tool updated: ${updated.name} (id: ${id})`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          tool: updated
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error updating tool:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to update tool'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // DELETE /api/tools/:id - Delete tool
+    if (url.pathname.match(/^\/api\/tools\/\d+$/) && req.method === 'DELETE') {
+      try {
+        const id = parseInt(url.pathname.split('/').pop()!);
+        const deleted = deleteTool(id);
+
+        if (!deleted) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Tool not found'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`Tool deleted: id ${id}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Tool deleted'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error deleting tool:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to delete tool'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // PATCH /api/tools/:id/toggle - Toggle tool enabled/disabled
+    if (url.pathname.match(/^\/api\/tools\/\d+\/toggle$/) && req.method === 'PATCH') {
+      try {
+        const id = parseInt(url.pathname.split('/')[3]);
+        const toggled = toggleTool(id);
+
+        if (!toggled) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Tool not found'
+          }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log(`Tool toggled: ${toggled.name} -> ${toggled.enabled ? 'enabled' : 'disabled'}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          tool: toggled
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error toggling tool:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to toggle tool'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // GET /api/tools/templates - Get example tool templates
+    if (url.pathname === '/api/tools/templates' && req.method === 'GET') {
+      const templates = [
+        {
+          name: 'http_request',
+          description: 'Make HTTP requests to any API',
+          input_schema: { url: 'str', method: 'str', headers: 'dict', body: 'dict' },
+          handler_code: `async def http_request(args: dict) -> dict:
+    """Make an HTTP request to an API endpoint."""
+    import httpx
+
+    url = args.get("url")
+    method = args.get("method", "GET").upper()
+    headers = args.get("headers", {})
+    body = args.get("body")
+
+    async with httpx.AsyncClient() as client:
+        response = await client.request(
+            method=method,
+            url=url,
+            headers=headers,
+            json=body if body else None
+        )
+
+        return {
+            "success": True,
+            "status_code": response.status_code,
+            "data": response.json() if response.headers.get("content-type", "").startswith("application/json") else response.text
+        }`,
+          env_vars: {}
+        },
+        {
+          name: 'autodesk_aps_projects',
+          description: 'Get projects from Autodesk APS (Forge)',
+          input_schema: { hub_id: 'str', limit: 'int' },
+          handler_code: `async def autodesk_aps_projects(args: dict) -> dict:
+    """Fetch projects from Autodesk APS (Platform Services)."""
+    import httpx
+    import os
+    import time
+
+    hub_id = args.get("hub_id")
+    limit = args.get("limit", 50)
+
+    if not hub_id:
+        return {"success": False, "error": "hub_id is required"}
+
+    client_id = os.environ.get("APS_CLIENT_ID")
+    client_secret = os.environ.get("APS_CLIENT_SECRET")
+
+    if not client_id or not client_secret:
+        return {"success": False, "error": "APS_CLIENT_ID and APS_CLIENT_SECRET must be set"}
+
+    # Get access token
+    async with httpx.AsyncClient() as client:
+        token_response = await client.post(
+            "https://developer.api.autodesk.com/authentication/v2/token",
+            data={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "grant_type": "client_credentials",
+                "scope": "data:read"
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"}
+        )
+        token_data = token_response.json()
+        access_token = token_data.get("access_token")
+
+        # Get projects
+        projects_response = await client.get(
+            f"https://developer.api.autodesk.com/project/v1/hubs/{hub_id}/projects",
+            headers={"Authorization": f"Bearer {access_token}"},
+            params={"page[limit]": limit}
+        )
+
+        data = projects_response.json()
+        projects = [
+            {
+                "id": item["id"],
+                "name": item["attributes"]["name"],
+                "created_at": item["attributes"].get("createdTime")
+            }
+            for item in data.get("data", [])
+        ]
+
+        return {"success": True, "hub_id": hub_id, "project_count": len(projects), "projects": projects}`,
+          env_vars: { APS_CLIENT_ID: '', APS_CLIENT_SECRET: '' }
+        }
+      ];
+
+      return new Response(JSON.stringify({
+        success: true,
+        templates
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // ==================== STATIC FILES (uploads) ====================

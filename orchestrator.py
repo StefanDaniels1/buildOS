@@ -32,6 +32,14 @@ from claude_agent_sdk import AssistantMessage, TextBlock, ToolUseBlock, ToolResu
 from sdk_tools import create_ifc_tools_server
 from conversation_logger import ConversationLogger
 
+# Import custom tools loader (for user-defined MCP tools)
+try:
+    from custom_tools import create_custom_tools_server
+    CUSTOM_TOOLS_AVAILABLE = True
+except ImportError:
+    CUSTOM_TOOLS_AVAILABLE = False
+    print("Custom tools module not available", file=sys.stderr)
+
 
 def load_conversation_history(session_id: str) -> list:
     """
@@ -490,16 +498,34 @@ async def run_orchestrator(
     ifc_server = create_ifc_tools_server()
     logger.log_debug("IFC tools registered", {"server": "ifc"})
 
+    # Build MCP servers dict
+    mcp_servers = {"ifc": ifc_server}
+
+    # Load custom tools if available
+    allowed_tools = [
+        "Task",           # Allow agent spawning
+        "Read",           # File reading
+        "Write",          # File writing
+        "Bash",           # Command execution
+        "mcp__ifc__*"     # All IFC tools (including Excel/PPTX generation)
+    ]
+
+    if CUSTOM_TOOLS_AVAILABLE:
+        try:
+            custom_server = create_custom_tools_server("custom")
+            if custom_server:
+                mcp_servers["custom"] = custom_server
+                allowed_tools.append("mcp__custom__*")  # Allow all custom tools
+                logger.log_debug("Custom tools registered", {"server": "custom"})
+                print("Custom tools server loaded", file=sys.stderr)
+        except Exception as e:
+            print(f"Failed to load custom tools: {e}", file=sys.stderr)
+            logger.log_debug("Custom tools failed to load", {"error": str(e)})
+
     # Configure SDK options
     options = ClaudeAgentOptions(
-        mcp_servers={"ifc": ifc_server},
-        allowed_tools=[
-            "Task",           # Allow agent spawning
-            "Read",           # File reading
-            "Write",          # File writing
-            "Bash",           # Command execution
-            "mcp__ifc__*"     # All IFC tools (including Excel/PPTX generation)
-        ],
+        mcp_servers=mcp_servers,
+        allowed_tools=allowed_tools,
         permission_mode="bypassPermissions",  # Auto-approve for automation
         cwd=str(workspace),
         setting_sources=["project"],  # Auto-loads .claude/agents/*.md
@@ -512,188 +538,106 @@ async def run_orchestrator(
         "timestamp": datetime.now().isoformat()
     }, session_id, dashboard_url)
 
+    # Resolve all paths ONCE at orchestrator startup (fixes path resolution issues)
+    project_dir = Path(__file__).parent.resolve()
+    durability_db_path = project_dir / ".claude" / "skills" / "ifc-analysis" / "reference" / "durability_database.json"
+
+    # Determine the IFC file to use (prefer file_path, fallback to first IFC in available_files)
+    ifc_file_to_use = file_path
+    if not ifc_file_to_use and available_files:
+        for f in available_files:
+            if f.lower().endswith('.ifc'):
+                ifc_file_to_use = f
+                break
+
     try:
         # SDK IS the orchestrator - it coordinates everything
         async with ClaudeSDKClient(options=options) as client:
-            # Build orchestrator prompt - delegates to skill for workflow
-            skill_path = "$CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/SKILL.md"
-
             # Format conversation history if this is a continuation
             conversation_context = format_conversation_context(conversation_history)
             continuation_note = ""
             if is_continuation:
                 continuation_note = f"""
-## ⚠️ IMPORTANT: This is a Continuation of Session {session_id[:8]}
-
-You are continuing a conversation. The user has already interacted with you in this session.
-Review the previous exchanges below and maintain context. Do not repeat work already done.
-If the user is asking a follow-up question, answer based on the work already completed.
-
+## Session Continuation
+You are continuing session {session_id[:8]}. Review previous work and avoid repetition.
 {conversation_context}
 """
 
+            # Simplified, robust orchestrator prompt with pre-resolved paths
             orchestrator_prompt = f"""You are the buildOS orchestrator for building sustainability analysis.
 
-**User Request**: "{message}"
-**IFC File**: {file_path if file_path else "No file provided"}
-**Available Files**: {', '.join(available_files) if available_files else "None"}
-**Session Context**: {session_context}/
-**Session ID**: {session_id}
+## Context
+- **User Request**: "{message}"
+- **IFC File**: {ifc_file_to_use if ifc_file_to_use else "No file provided"}
+- **Available Files**: {', '.join(available_files) if available_files else "None"}
+- **Session Folder**: {session_context}/
+- **Durability Database**: {durability_db_path}
 {continuation_note}
 
-## ⚠️ CRITICAL WORKFLOW RULES
+## Workflow Steps
 
-1. **PARALLEL BATCH PROCESSING** - Spawn ALL batch Tasks in a SINGLE message for parallel execution
-2. **DELEGATE, don't do** - YOU do NOT classify elements, subagents do
-3. **Wait for ALL Tasks** - After spawning parallel Tasks, wait for all results before aggregating
-4. **Aggregate after ALL Tasks** - Use `mcp__ifc__aggregate_batch_results` only after all batches complete
-
-## 🚫 FORBIDDEN ACTIONS FOR ORCHESTRATOR
-
-You are the ORCHESTRATOR. You coordinate, you do NOT do the work yourself:
-- ❌ Do NOT read batches.json to classify elements yourself
-- ❌ Do NOT read CLASSIFICATION.md (that's for the batch-processor agent)
-- ❌ Do NOT write batch_N_elements.json (that's the subagent's output)
-- ❌ Do NOT classify elements yourself - ALWAYS delegate to batch-processor
-- ✅ DO spawn ALL batch Tasks in PARALLEL (one message, multiple Task calls)
-- ✅ DO wait for all Task results before proceeding
-- ✅ DO use aggregate_batch_results AFTER all Tasks return
-
-## Workflow Status Tool
-
-Before starting, check workflow status:
+### 1. Check Status
 ```
-Tool: mcp__ifc__get_workflow_status
-Parameters: {{"session_context": "{session_context}"}}
+mcp__ifc__get_workflow_status(session_context="{session_context}")
 ```
 
-This shows what stages are complete and recommends next steps.
-
-## Skill-Based Workflow
-
-For IFC analysis and CO2 calculations, read the skill file:
-**Skill Guide**: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/SKILL.md
-
-## Correct Batch Processing Workflow
-
-### Step 1: Parse
+### 2. Parse IFC (if needed)
 ```
-mcp__ifc__parse_ifc_file(ifc_path, output_path="{session_context}/parsed_data.json")
+mcp__ifc__parse_ifc_file(ifc_path="{ifc_file_to_use}", output_path="{session_context}/parsed_data.json")
 ```
 
-### Step 2: Prepare Batches
+### 3. Prepare Batches
 ```
 mcp__ifc__prepare_batches(json_path="{session_context}/parsed_data.json", batch_size=50, output_path="{session_context}/batches.json")
 ```
 
-### Step 3: Classify (DELEGATE TO SUBAGENTS IN PARALLEL!)
+### 4. Classify (SPAWN ALL TASKS IN ONE MESSAGE!)
+For each batch N, spawn a Task with:
+- subagent_type: "batch-processor"
+- description: "Classify batch N"
+- prompt: "Session: {session_context}/ Batch: N"
 
-⚠️ **YOU DO NOT CLASSIFY** - You spawn agents who do the classification.
+⚠️ Spawn ALL batch Tasks in a SINGLE message for parallel execution!
 
-🚀 **PARALLEL EXECUTION - SPAWN ALL BATCHES AT ONCE!** 🚀
-
-Spawn ALL batch-processor Tasks in a SINGLE message for maximum parallelism.
-This is REQUIRED for efficient processing and proper visualization.
-
-**CORRECT (all tasks in one message - PARALLEL):**
-```
-Task: batch-processor (batch 1)
-Task: batch-processor (batch 2)
-Task: batch-processor (batch 3)
-Task: batch-processor (batch 4)
-→ All run in PARALLEL, results come back together
-```
-
-**WRONG (sequential - too slow):**
-```
-Message 1: Task: batch-processor (batch 1) → wait
-Message 2: Task: batch-processor (batch 2) → wait
-... this is INEFFICIENT!
-```
-
-**Spawn ALL batches like this (in ONE message):**
-```
-Task: batch-processor
-  subagent_type: "batch-processor"
-  description: "Classify batch 1"
-  prompt: "Classify batch 1. Session: {session_context}/ Batch: 1"
-
-Task: batch-processor
-  subagent_type: "batch-processor"
-  description: "Classify batch 2"
-  prompt: "Classify batch 2. Session: {session_context}/ Batch: 2"
-
-... (continue for all batches)
-```
-
-**What each subagent does (NOT you):**
-- Reads batches.json
-- Reads CLASSIFICATION.md
-- Classifies its assigned batch
-- Writes batch_N_elements.json
-- Returns summary
-
-**What YOU do:**
-- Spawn ALL batch Tasks in ONE message (parallel)
-- Wait for ALL results to come back
-- Then proceed to aggregation
-
-**DO NOT** read batches.json, CLASSIFICATION.md, or write batch files yourself!
-
-### Step 4: Aggregate Results (AFTER Tasks Return!)
-After ALL batch-processor Tasks have returned:
+### 5. Aggregate Results
+After ALL Tasks complete:
 ```
 mcp__ifc__aggregate_batch_results(session_context="{session_context}", total_batches=N, output_file="{session_context}/all_classified_elements.json")
 ```
 
-### Step 5: Calculate CO2
-Use the aggregated file:
+### 6. Calculate CO2
 ```
-mcp__ifc__calculate_co2(classified_path="{session_context}/all_classified_elements.json", ...)
-```
-
-### Step 6: Generate Report
-Use the CO2 report file:
-```
-mcp__ifc__generate_excel_report(data_json="{session_context}/co2_report.json", ...)
+mcp__ifc__calculate_co2(
+  classified_path="{session_context}/all_classified_elements.json",
+  database_path="{durability_db_path}",
+  output_path="{session_context}/co2_report.json"
+)
 ```
 
-## Quick Reference
+### 7. Generate Report
+For PDF:
+```
+mcp__ifc__generate_pdf_report(
+  co2_report_path="{session_context}/co2_report.json",
+  ifc_filename="{Path(ifc_file_to_use).name if ifc_file_to_use else 'model.ifc'}",
+  output_path="{session_context}/sustainability_report.pdf"
+)
+```
 
-| Step | Tool/Script | Purpose |
-|------|-------------|---------|
-| Parse IFC | `mcp__ifc__parse_ifc_file` | Extract building elements |
-| Prepare Batches | `mcp__ifc__prepare_batches` | Split for processing |
-| Classify | Task agents (batch-processor) | Material classification |
-| **Aggregate** | `mcp__ifc__aggregate_batch_results` | Combine batch results |
-| Calculate CO2 | `mcp__ifc__calculate_co2` | CO2 impact calculation |
-| Generate PDF | `mcp__ifc__generate_pdf_report` | Create PDF report (ReportLab) |
-| Generate Excel | `mcp__ifc__generate_excel_report` | Create Excel spreadsheet |
-| Generate PPTX | `mcp__ifc__generate_presentation` | Create PowerPoint |
+For Excel:
+```
+mcp__ifc__generate_excel_report(
+  prompt="Create CO2 analysis report",
+  output_dir="{session_context}",
+  data_json="{session_context}/co2_report.json"
+)
+```
 
-## Session Context
-
-All intermediate files go in: {session_context}/
-- parsed_data.json
-- batches.json
-- batch_N_elements.json (per batch)
-- all_classified_elements.json (aggregated)
-- co2_report.json
-- report.xlsx / report.pdf
-
-## Important Paths
-
-- Skill scripts: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/scripts/
-- Reference data: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/
-- Database: $CLAUDE_PROJECT_DIR/.claude/skills/ifc-analysis/reference/durability_database.json
-
-**REMEMBER: You are the ORCHESTRATOR, not the WORKER.**
-- SPAWN ALL batch Tasks in PARALLEL (one message, multiple Task calls)
-- WAIT for ALL Task results before proceeding to aggregation
-- Read each Task's return message (e.g., "✅ Batch 1 complete")
-- Never classify elements yourself
-- Never write batch files yourself
-- Use aggregate_batch_results AFTER all Tasks complete
+## Rules
+1. **Delegate classification**: You spawn batch-processor Tasks, you don't classify yourself
+2. **Parallel execution**: Spawn ALL batch Tasks in ONE message
+3. **Wait for completion**: Only aggregate AFTER all Tasks return
+4. **Use exact paths**: All paths above are pre-resolved - use them exactly as shown
 """
 
             # Log the orchestrator prompt - FULL VISIBILITY

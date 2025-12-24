@@ -8,12 +8,41 @@ Tools are namespaced as: mcp__ifc__<tool_name>
 from claude_agent_sdk import tool, create_sdk_mcp_server
 from typing import Dict, Any
 import json
+import os
 from pathlib import Path
+
+
+def _resolve_path(path_str: str) -> Path:
+    """
+    Resolve paths, handling environment variables and relative paths.
+
+    Handles:
+    - $CLAUDE_PROJECT_DIR -> actual project directory
+    - /app/ prefix -> project directory (Docker compatibility)
+    - Relative paths -> absolute paths
+    """
+    if not path_str:
+        return Path(path_str)
+
+    # Replace $CLAUDE_PROJECT_DIR with actual project directory
+    if "$CLAUDE_PROJECT_DIR" in path_str:
+        project_dir = str(Path(__file__).parent.resolve())
+        path_str = path_str.replace("$CLAUDE_PROJECT_DIR", project_dir)
+
+    # Handle /app/ prefix (Docker compatibility)
+    if path_str.startswith("/app/"):
+        project_dir = Path(__file__).parent.resolve()
+        path_str = str(project_dir / path_str[5:])
+
+    # Expand user and environment variables
+    path_str = os.path.expanduser(os.path.expandvars(path_str))
+
+    return Path(path_str)
 
 
 @tool(
     name="parse_ifc_file",
-    description="Parse IFC file and extract building element data to JSON format",
+    description="Parse IFC file and extract building element data to JSON format. Paths are auto-resolved.",
     input_schema={
         "ifc_path": str,
         "output_path": str
@@ -33,14 +62,31 @@ async def parse_ifc_file(args: Dict[str, Any]) -> Dict[str, Any]:
     try:
         # Import IFC parser from tools
         import sys
-        from pathlib import Path
         tools_path = Path(__file__).parent / ".claude" / "tools"
         sys.path.insert(0, str(tools_path))
+
+        # Resolve paths (handles $CLAUDE_PROJECT_DIR, /app/, etc.)
+        ifc_path = _resolve_path(args["ifc_path"])
+        output_path_resolved = _resolve_path(args["output_path"])
+
+        # Validate IFC file exists
+        if not ifc_path.exists():
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "success": False,
+                        "error": f"IFC file not found: {ifc_path}",
+                        "original_path": args["ifc_path"]
+                    }, indent=2)
+                }],
+                "is_error": True
+            }
 
         # Use existing IFC parser from agent_system4
         import ifcopenshell
 
-        ifc_file = ifcopenshell.open(args["ifc_path"])
+        ifc_file = ifcopenshell.open(str(ifc_path))
 
         # Extract all rooted entities (elements that have geometry)
         elements = []
@@ -58,14 +104,13 @@ async def parse_ifc_file(args: Dict[str, Any]) -> Dict[str, Any]:
                 })
 
         # Write to JSON
-        output_path = Path(args["output_path"])
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path_resolved.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, 'w') as f:
+        with open(output_path_resolved, 'w') as f:
             json.dump({
                 "elements": elements,
                 "total_count": len(elements),
-                "source_file": args["ifc_path"]
+                "source_file": str(ifc_path)
             }, f, indent=2)
 
         return {
@@ -74,7 +119,7 @@ async def parse_ifc_file(args: Dict[str, Any]) -> Dict[str, Any]:
                 "text": json.dumps({
                     "success": True,
                     "entities_parsed": len(elements),
-                    "output_file": str(output_path)
+                    "output_file": str(output_path_resolved)
                 }, indent=2)
             }]
         }
@@ -174,7 +219,7 @@ async def prepare_batches(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     name="calculate_co2",
-    description="Calculate CO2 impact from classified building elements using durability database",
+    description="Calculate CO2 impact from classified building elements using durability database. Paths are auto-resolved (supports $CLAUDE_PROJECT_DIR and /app/ prefixes).",
     input_schema={
         "classified_path": str,
         "database_path": str,
@@ -187,59 +232,151 @@ async def calculate_co2(args: Dict[str, Any]) -> Dict[str, Any]:
 
     Args:
         classified_path: Path to classified elements JSON
-        database_path: Path to durability database JSON
+        database_path: Path to durability database JSON (auto-resolved)
         output_path: Path to output CO2 results
 
     Returns:
         Success status and total CO2
     """
     try:
+        # Resolve paths (handles $CLAUDE_PROJECT_DIR, /app/, etc.)
+        classified_path = _resolve_path(args["classified_path"])
+        database_path = _resolve_path(args["database_path"])
+        output_path = _resolve_path(args["output_path"])
+
+        # Validate input files exist
+        if not classified_path.exists():
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "success": False,
+                        "error": f"Classified elements file not found: {classified_path}",
+                        "hint": "Make sure aggregate_batch_results was called first"
+                    }, indent=2)
+                }],
+                "is_error": True
+            }
+
+        if not database_path.exists():
+            # Try default database location
+            default_db = Path(__file__).parent / ".claude" / "skills" / "ifc-analysis" / "reference" / "durability_database.json"
+            if default_db.exists():
+                database_path = default_db
+            else:
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps({
+                            "success": False,
+                            "error": f"Durability database not found: {database_path}",
+                            "hint": f"Default location: {default_db}"
+                        }, indent=2)
+                    }],
+                    "is_error": True
+                }
+
         # Load classified elements
-        with open(args["classified_path"], 'r') as f:
+        with open(classified_path, 'r') as f:
             classified_data = json.load(f)
 
         # Load durability database
-        with open(args["database_path"], 'r') as f:
+        with open(database_path, 'r') as f:
             database = json.load(f)
+
+        # Get materials lookup from database
+        materials_db = database.get("materials", database)
 
         # Calculate CO2 for each element
         results = []
         total_co2 = 0.0
+        elements_with_volume = 0
+        elements_without_volume = 0
+        by_category = {}
 
         for element in classified_data.get("elements", []):
-            concrete_type = element.get("concrete_type", "Unknown")
-            volume = element.get("volume_m3", 0.0)
+            # Get material classification
+            material_primary = element.get("material_primary", {})
+            if isinstance(material_primary, dict):
+                category = material_primary.get("category", "unknown")
+                subcategory = material_primary.get("subcategory", "generic")
+            else:
+                category = str(material_primary) if material_primary else "unknown"
+                subcategory = "generic"
+
+            # Get volume (handle null/None gracefully)
+            volume = element.get("volume_m3")
+            if volume is None or volume == "null":
+                volume = 0.0
+                elements_without_volume += 1
+            else:
+                try:
+                    volume = float(volume)
+                    elements_with_volume += 1
+                except (ValueError, TypeError):
+                    volume = 0.0
+                    elements_without_volume += 1
 
             # Look up CO2 factor in database
-            co2_factor = database.get(concrete_type, {}).get("co2_per_m3", 0.0)
+            co2_factor = 0.0
+            material_info = materials_db.get(category, {})
+            if isinstance(material_info, dict):
+                sub_info = material_info.get(subcategory, material_info.get(f"{category}_generic", {}))
+                if isinstance(sub_info, dict):
+                    # Calculate CO2: embodied_co2_per_kg * density * volume
+                    embodied_co2 = sub_info.get("embodied_co2_per_kg", 0.0)
+                    density = sub_info.get("density_kg_m3", 2400)  # default concrete density
+                    co2_factor = embodied_co2 * density
+
             element_co2 = volume * co2_factor
+
+            # Track by category
+            if category not in by_category:
+                by_category[category] = {"count": 0, "co2_kg": 0.0, "volume_m3": 0.0}
+            by_category[category]["count"] += 1
+            by_category[category]["co2_kg"] += element_co2
+            by_category[category]["volume_m3"] += volume
 
             results.append({
                 **element,
-                "co2_kg": element_co2,
-                "co2_factor": co2_factor
+                "co2_kg": round(element_co2, 2),
+                "co2_factor_per_m3": round(co2_factor, 2)
             })
 
             total_co2 += element_co2
 
+        # Calculate percentages
+        for cat in by_category:
+            by_category[cat]["percentage"] = round(by_category[cat]["co2_kg"] / total_co2 * 100, 1) if total_co2 > 0 else 0
+
         # Write results
-        output_path = Path(args["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        report = {
+            "summary": {
+                "total_co2_kg": round(total_co2, 2),
+                "element_count": len(results),
+                "elements_with_volume": elements_with_volume,
+                "elements_without_volume": elements_without_volume,
+                "completeness_pct": round(elements_with_volume / len(results) * 100, 1) if results else 0
+            },
+            "by_category": by_category,
+            "elements": results
+        }
+
         with open(output_path, 'w') as f:
-            json.dump({
-                "elements": results,
-                "total_co2_kg": total_co2,
-                "element_count": len(results)
-            }, f, indent=2)
+            json.dump(report, f, indent=2)
 
         return {
             "content": [{
                 "type": "text",
                 "text": json.dumps({
                     "success": True,
-                    "total_co2_kg": total_co2,
+                    "total_co2_kg": round(total_co2, 2),
                     "element_count": len(results),
+                    "elements_with_volume": elements_with_volume,
+                    "elements_without_volume": elements_without_volume,
+                    "completeness_pct": report["summary"]["completeness_pct"],
                     "output_file": str(output_path)
                 }, indent=2)
             }]
@@ -262,7 +399,7 @@ async def calculate_co2(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     name="generate_excel_report",
-    description="Generate an Excel spreadsheet using Claude's Excel skill. Use this for creating formatted Excel reports with data analysis, charts, and proper formatting. The data_json parameter can be either a JSON string or a file path to a JSON file.",
+    description="Generate an Excel spreadsheet using Claude's Excel skill. Use this for creating formatted Excel reports with data analysis, charts, and proper formatting. The data_json parameter can be either a JSON string or a file path to a JSON file. Paths are auto-resolved.",
     input_schema={
         "prompt": str,
         "output_dir": str,
@@ -272,31 +409,34 @@ async def calculate_co2(args: Dict[str, Any]) -> Dict[str, Any]:
 async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate an Excel report using Claude's Excel skill.
-    
+
     Args:
         prompt: Description of what Excel file to create
         output_dir: Directory to save the output file
         data_json: Optional JSON string OR file path to a JSON file
-        
+
     Returns:
         Success status and file path
     """
     try:
         import os
-        from pathlib import Path
-        
+
         # First, try to use the Skills API if available
         api_key = os.environ.get("ANTHROPIC_API_KEY")
-        
+
+        # Resolve output directory path
+        output_dir = _resolve_path(args["output_dir"])
+
         # Load data from file path or parse JSON string
         data_str = ""
         if args.get("data_json"):
             data_json_input = args["data_json"]
-            
-            # Check if it's a file path
-            if data_json_input.startswith("/") or data_json_input.startswith("./"):
+
+            # Check if it's a file path (resolve it first)
+            if data_json_input.startswith("/") or data_json_input.startswith("./") or data_json_input.startswith("$") or data_json_input.startswith("workspace"):
+                resolved_path = _resolve_path(data_json_input)
                 try:
-                    with open(data_json_input, 'r') as f:
+                    with open(resolved_path, 'r') as f:
                         data = json.load(f)
                         data_str = json.dumps(data, indent=2)
                 except FileNotFoundError:
@@ -305,7 +445,8 @@ async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
                             "type": "text",
                             "text": json.dumps({
                                 "success": False,
-                                "error": f"Data file not found: {data_json_input}"
+                                "error": f"Data file not found: {resolved_path}",
+                                "original_path": data_json_input
                             }, indent=2)
                         }],
                         "is_error": True
@@ -316,7 +457,7 @@ async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
                             "type": "text",
                             "text": json.dumps({
                                 "success": False,
-                                "error": f"Invalid JSON in file {data_json_input}: {str(e)}"
+                                "error": f"Invalid JSON in file {resolved_path}: {str(e)}"
                             }, indent=2)
                         }],
                         "is_error": True
@@ -351,7 +492,7 @@ async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
                 
                 result = await client.generate_excel(
                     prompt=full_prompt,
-                    output_dir=args["output_dir"]
+                    output_dir=str(output_dir)
                 )
                 
                 if result["success"] and result["files"]:
@@ -388,7 +529,9 @@ async def generate_excel_report(args: Dict[str, Any]) -> Dict[str, Any]:
                 print(f"Skills API error: {e}, using openpyxl fallback")
         
         # Fallback: Use openpyxl to create Excel file locally
-        return await _generate_excel_with_openpyxl(args, data_str)
+        # Pass resolved output_dir in args
+        args_with_resolved = {**args, "output_dir": str(output_dir)}
+        return await _generate_excel_with_openpyxl(args_with_resolved, data_str)
         
     except Exception as e:
         import traceback
@@ -733,7 +876,7 @@ async def generate_presentation(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     name="generate_pdf_report",
-    description="Generate a PDF sustainability report using ReportLab. This creates a professional PDF directly without external APIs. Use this for CO2 analysis reports. Requires a co2_report.json file as input.",
+    description="Generate a PDF sustainability report using ReportLab. This creates a professional PDF directly without external APIs. Use this for CO2 analysis reports. Requires a co2_report.json file as input. Paths are auto-resolved.",
     input_schema={
         "co2_report_path": str,
         "ifc_filename": str,
@@ -753,11 +896,11 @@ async def generate_pdf_report(args: Dict[str, Any]) -> Dict[str, Any]:
         Success status and file path
     """
     try:
-        from pathlib import Path
         import sys
 
-        co2_report_path = Path(args["co2_report_path"])
-        output_path = Path(args["output_path"])
+        # Resolve paths (handles $CLAUDE_PROJECT_DIR, /app/, etc.)
+        co2_report_path = _resolve_path(args["co2_report_path"])
+        output_path = _resolve_path(args["output_path"])
         ifc_filename = args["ifc_filename"]
 
         # Validate input file exists
@@ -767,7 +910,8 @@ async def generate_pdf_report(args: Dict[str, Any]) -> Dict[str, Any]:
                     "type": "text",
                     "text": json.dumps({
                         "success": False,
-                        "error": f"CO2 report file not found: {co2_report_path}"
+                        "error": f"CO2 report file not found: {co2_report_path}",
+                        "hint": "Make sure calculate_co2 was called first and produced co2_report.json"
                     }, indent=2)
                 }],
                 "is_error": True
