@@ -9,11 +9,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.5.0",
     "@thatopen/components": "^2.4.0",
     "@thatopen/ui": "^2.4.0",
+    "jspreadsheet-ce": "^5.0.4",
+    "stats.js": "^0.17.0",
     "three": "^0.175.0",
-    "stats.js": "^0.17.0"
+    "vue": "^3.5.0",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
     "@types/three": "^0.175.0",

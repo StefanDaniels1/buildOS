@@ -201,8 +201,14 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
     # Track the last text response for the final Stop event
     last_text_response = ""
 
+    # Track spreadsheet data from generate_spreadsheet tool results
+    last_spreadsheet_data = None
+
     # Track pending Task calls to match with results and send SubagentEnd
     pending_tasks = {}  # tool_use_id -> {"agent_type", "agent_id", "description", "is_background"}
+
+    # Track pending tool calls to match tool results
+    pending_tool_calls = {}  # tool_use_id -> tool_name
 
     # Track which agent is currently "active" (for synchronous tasks only)
     # Background tasks don't change the active agent
@@ -235,7 +241,11 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                         tool_input=block.input,
                         agent_id="orchestrator"
                     )
-                    
+
+                    # Track this tool call for result matching
+                    tool_use_id = block.id if hasattr(block, 'id') else f"tool_{len(pending_tool_calls)}"
+                    pending_tool_calls[tool_use_id] = block.name
+
                     if block.name == "Task":
                         # Subagent spawn - LOG IT
                         agent_type = block.input.get("subagent_type", "unknown")
@@ -289,8 +299,25 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                     tool_result = block.content if hasattr(block, 'content') else str(block)
                     is_error = block.is_error if hasattr(block, 'is_error') else False
 
-                    # Check if this result is for a pending Task (subagent completion)
+                    # Identify which tool this result is for
                     tool_use_id = block.tool_use_id if hasattr(block, 'tool_use_id') else None
+                    tool_name = pending_tool_calls.pop(tool_use_id, "unknown") if tool_use_id else "unknown"
+
+                    # Check for spreadsheet data in tool result (from generate_spreadsheet, csv_to_spreadsheet)
+                    if tool_name in ["mcp__ifc__generate_spreadsheet", "mcp__ifc__csv_to_spreadsheet"]:
+                        try:
+                            # Extract JSON from tool result
+                            result_str = str(tool_result)
+                            # Try to parse as JSON to get spreadsheet data
+                            if '"spreadsheet"' in result_str:
+                                import json
+                                result_json = json.loads(result_str)
+                                if result_json.get("success") and result_json.get("spreadsheet"):
+                                    last_spreadsheet_data = result_json
+                        except (json.JSONDecodeError, TypeError, AttributeError):
+                            pass  # Not valid JSON, ignore
+
+                    # Check if this result is for a pending Task (subagent completion)
                     task_info = None
 
                     if tool_use_id and tool_use_id in pending_tasks:
@@ -332,7 +359,7 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                     else:
                         # Regular tool result (not a Task)
                         logger.log_tool_result(
-                            tool_name="unknown",
+                            tool_name=tool_name,
                             tool_output=tool_result,
                             success=not is_error,
                             error=tool_result if is_error else None,
@@ -368,12 +395,19 @@ async def stream_to_dashboard(client: ClaudeSDKClient, session_id: str, dashboar
                 message.result if hasattr(message, 'result') else 'Done'
             )
 
-            # Send completion event with the full final response
-            await send_event("Stop", {
+            # Build Stop event payload
+            stop_payload = {
                 "status": "success" if not message.is_error else "error",
                 "message": final_message,
                 "timestamp": datetime.now().isoformat()
-            }, session_id, dashboard_url)
+            }
+
+            # Include spreadsheet data if we captured it from a tool result
+            if last_spreadsheet_data and not message.is_error:
+                stop_payload["spreadsheet"] = last_spreadsheet_data.get("spreadsheet")
+
+            # Send completion event with the full final response
+            await send_event("Stop", stop_payload, session_id, dashboard_url)
 
 
 async def run_orchestrator(
@@ -614,8 +648,19 @@ mcp__ifc__calculate_co2(
 )
 ```
 
-### 7. Generate Report
-For PDF:
+### 7. Generate Output
+
+**IMPORTANT: For ALL tabular data, use generate_spreadsheet (NOT generate_excel_report):**
+```
+mcp__ifc__generate_spreadsheet(
+  name="CO2 Analysis Report",
+  data=[["Element", "Material", "Volume", "CO2 (kg)"], ["Wall-001", "Concrete", 12.5, 3450], ...],
+  columns=[{{"title": "Element", "width": 150}}, {{"title": "Material", "width": 120}}, ...]
+)
+```
+After calling this, tell the user: "Switch to the **Spreadsheet view** to see and edit the data. You can export to Excel or CSV from there."
+
+**For PDF reports only:**
 ```
 mcp__ifc__generate_pdf_report(
   co2_report_path="{session_context}/co2_report.json",
@@ -624,20 +669,55 @@ mcp__ifc__generate_pdf_report(
 )
 ```
 
-For Excel:
-```
-mcp__ifc__generate_excel_report(
-  prompt="Create CO2 analysis report",
-  output_dir="{session_context}",
-  data_json="{session_context}/co2_report.json"
-)
-```
-
 ## Rules
 1. **Delegate classification**: You spawn batch-processor Tasks, you don't classify yourself
 2. **Parallel execution**: Spawn ALL batch Tasks in ONE message
 3. **Wait for completion**: Only aggregate AFTER all Tasks return
 4. **Use exact paths**: All paths above are pre-resolved - use them exactly as shown
+5. **NEVER use generate_excel_report**: ALWAYS use `generate_spreadsheet` for tabular data. The user can export to Excel from the Spreadsheet view. Do NOT call generate_excel_report unless user says "download Excel file" or "export as .xlsx".
+
+## CSV Agent Tools
+
+When user wants to work with CSV data, use these tools:
+
+### Loading CSV Files
+```
+mcp__ifc__csv_to_spreadsheet(file_path="/path/to/file.csv", name="My Data")
+```
+This loads CSV directly into the Spreadsheet Builder. Tell the user to switch to Spreadsheet view.
+
+### Parsing CSV (for inspection)
+```
+mcp__ifc__parse_csv(source="file_path", file_path="/path/to/file.csv", preview_rows=10)
+```
+Returns headers, preview data, and column info. Use when user wants to see what's in a CSV before loading.
+
+### Analyzing CSV
+```
+mcp__ifc__analyze_csv(file_path="/path/to/file.csv")
+```
+Returns statistics: column types, value distributions, missing values. Use when user asks "what's in this CSV?" or "analyze this data".
+
+### Transforming CSV
+```
+mcp__ifc__transform_csv(
+  file_path="/path/to/file.csv",
+  filter_column="Status",
+  filter_value="Active",
+  filter_operator="equals",
+  sort_column="Date",
+  group_by="Category",
+  aggregate="sum"
+)
+```
+Filter, sort, or aggregate data. Returns transformed data for spreadsheet.
+
+### CSV File Sources
+- User uploads: Files are in availableFiles array (e.g., "uploads/timestamp_filename.csv")
+- Context: Session context folder for processed data
+- URLs: Use source="url" with url parameter in parse_csv
+
+When user mentions CSV, always check availableFiles for uploaded CSV files first!
 """
 
             # Log the orchestrator prompt - FULL VISIBILITY

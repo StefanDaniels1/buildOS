@@ -116,7 +116,7 @@ const flowData = computed(() => {
     }
 
     const node: FlowNode = {
-      id: event.id,
+      id: String(event.id ?? ''),
       event,
       x: currentX,
       y: BASE_Y + lane * LANE_HEIGHT,

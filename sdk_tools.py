@@ -399,7 +399,7 @@ async def calculate_co2(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     name="generate_excel_report",
-    description="Generate an Excel spreadsheet using Claude's Excel skill. Use this for creating formatted Excel reports with data analysis, charts, and proper formatting. The data_json parameter can be either a JSON string or a file path to a JSON file. Paths are auto-resolved.",
+    description="WARNING: Do NOT use this tool unless user explicitly says 'download Excel', 'export to xlsx', or 'Excel file'. For displaying tabular data, use generate_spreadsheet instead. This tool creates a downloadable .xlsx file - only use when user specifically requests a file download.",
     input_schema={
         "prompt": str,
         "output_dir": str,
@@ -722,6 +722,123 @@ async def _generate_excel_with_openpyxl(args: Dict[str, Any], data_str: str) -> 
             }],
             "is_error": True
         }
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": False,
+                    "error": str(e),
+                    "traceback": traceback.format_exc()
+                }, indent=2)
+            }],
+            "is_error": True
+        }
+
+
+@tool(
+    name="generate_spreadsheet",
+    description="PREFERRED tool for all tabular data output (bill of materials, element lists, CO2 breakdowns, etc). Displays data in the interactive Spreadsheet Builder where users can review, edit, and export. Use this INSTEAD of generate_excel_report for initial data display. Only use generate_excel_report when user explicitly requests a downloadable Excel file. The data parameter accepts a 2D array like [[\"Header1\", \"Header2\"], [\"row1col1\", \"row1col2\"]].",
+    input_schema={
+        "name": str,
+        "data": str,  # 2D array as JSON string OR actual array - will be parsed
+        "columns": str  # Column definitions as JSON string OR actual array - optional
+    }
+)
+async def generate_spreadsheet(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Generate spreadsheet data for the interactive frontend editor.
+
+    Args:
+        name: Name/title of the spreadsheet
+        data: 2D array of cell values (rows x columns) - can be array or JSON string
+        columns: List of column definitions (e.g., [{"title": "Element", "width": 150}, ...])
+
+    Returns:
+        Spreadsheet data in jspreadsheet-compatible format
+    """
+    try:
+        name = args.get("name", "Spreadsheet")
+        data = args.get("data", [])
+        columns = args.get("columns", [])
+
+        # Handle data passed as JSON string (common when agent constructs it)
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError:
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": json.dumps({
+                            "success": False,
+                            "error": "Invalid data format. Expected a 2D array or valid JSON string.",
+                            "received": data[:200] if len(data) > 200 else data
+                        }, indent=2)
+                    }],
+                    "is_error": True
+                }
+
+        # Handle columns passed as JSON string
+        if isinstance(columns, str):
+            try:
+                columns = json.loads(columns)
+            except json.JSONDecodeError:
+                columns = []
+
+        # Validate data is a 2D array
+        if not isinstance(data, list):
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": json.dumps({
+                        "success": False,
+                        "error": "Data must be a 2D array (list of lists)"
+                    }, indent=2)
+                }],
+                "is_error": True
+            }
+
+        # Ensure columns are properly formatted
+        formatted_columns = []
+        for col in columns:
+            if isinstance(col, str):
+                formatted_columns.append({"title": col, "width": 120})
+            elif isinstance(col, dict):
+                formatted_columns.append({
+                    "title": col.get("title", ""),
+                    "width": col.get("width", 120),
+                    "type": col.get("type", "text")
+                })
+            else:
+                formatted_columns.append({"title": str(col), "width": 120})
+
+        # If no columns provided, generate from first row or default
+        if not formatted_columns and data and len(data) > 0:
+            first_row = data[0] if isinstance(data[0], list) else [data[0]]
+            formatted_columns = [{"title": f"Column {i+1}", "width": 120} for i in range(len(first_row))]
+
+        spreadsheet_data = {
+            "type": "spreadsheet",
+            "name": name,
+            "data": data,
+            "columns": formatted_columns,
+            "row_count": len(data),
+            "column_count": len(formatted_columns)
+        }
+
+        return {
+            "content": [{
+                "type": "text",
+                "text": json.dumps({
+                    "success": True,
+                    "spreadsheet": spreadsheet_data,
+                    "message": f"Spreadsheet '{name}' generated with {len(data)} rows and {len(formatted_columns)} columns. Switch to the Spreadsheet view to see and edit the data."
+                }, indent=2)
+            }]
+        }
+
     except Exception as e:
         import traceback
         return {
@@ -1399,6 +1516,598 @@ async def get_workflow_status(args: Dict[str, Any]) -> Dict[str, Any]:
         }
 
 
+# ==================== CSV AGENT TOOLS ====================
+
+@tool(
+    name="parse_csv",
+    description="Parse a CSV file and return its contents. Supports CSV files from uploads or file paths. Returns data in a format ready for spreadsheet display. Use this as the first step when working with CSV data.",
+    input_schema={
+        "source": str,  # "file_path", "url", or "inline_data"
+        "file_path": str,  # Path to CSV file (for source="file_path")
+        "url": str,  # URL to fetch CSV from (for source="url")
+        "inline_data": str,  # Raw CSV string (for source="inline_data")
+        "delimiter": str,  # Optional: delimiter character (default: auto-detect)
+        "has_header": bool,  # Optional: whether first row is header (default: True)
+        "preview_rows": int  # Optional: limit rows for preview (default: all)
+    }
+)
+async def parse_csv(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Parse CSV data from various sources.
+
+    Args:
+        source: Data source type - "file_path", "url", or "inline_data"
+        file_path: Path to CSV file
+        url: URL to fetch CSV from
+        inline_data: Raw CSV string
+        delimiter: CSV delimiter (auto-detected if not provided)
+        has_header: Whether first row contains headers
+        preview_rows: Limit number of rows returned
+
+    Returns:
+        Parsed CSV data with metadata
+    """
+    import csv
+    import io
+
+    try:
+        source_type = args.get("source", "file_path")
+        delimiter = args.get("delimiter", None)
+        has_header = args.get("has_header", True)
+        preview_rows = args.get("preview_rows", None)
+
+        csv_content = ""
+        source_info = ""
+
+        # Get CSV content based on source
+        if source_type == "file_path":
+            file_path = args.get("file_path", "")
+            if not file_path:
+                return {
+                    "content": [{"type": "text", "text": json.dumps({
+                        "success": False,
+                        "error": "file_path is required when source='file_path'"
+                    }, indent=2)}],
+                    "is_error": True
+                }
+
+            resolved_path = _resolve_path(file_path)
+            if not resolved_path.exists():
+                return {
+                    "content": [{"type": "text", "text": json.dumps({
+                        "success": False,
+                        "error": f"File not found: {resolved_path}"
+                    }, indent=2)}],
+                    "is_error": True
+                }
+
+            with open(resolved_path, 'r', encoding='utf-8-sig') as f:
+                csv_content = f.read()
+            source_info = str(resolved_path)
+
+        elif source_type == "url":
+            url = args.get("url", "")
+            if not url:
+                return {
+                    "content": [{"type": "text", "text": json.dumps({
+                        "success": False,
+                        "error": "url is required when source='url'"
+                    }, indent=2)}],
+                    "is_error": True
+                }
+
+            import httpx
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url, timeout=30.0)
+                response.raise_for_status()
+                csv_content = response.text
+            source_info = url
+
+        elif source_type == "inline_data":
+            csv_content = args.get("inline_data", "")
+            if not csv_content:
+                return {
+                    "content": [{"type": "text", "text": json.dumps({
+                        "success": False,
+                        "error": "inline_data is required when source='inline_data'"
+                    }, indent=2)}],
+                    "is_error": True
+                }
+            source_info = "inline"
+        else:
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": f"Invalid source type: {source_type}. Use 'file_path', 'url', or 'inline_data'"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        # Auto-detect delimiter if not provided
+        if not delimiter:
+            sniffer = csv.Sniffer()
+            try:
+                sample = csv_content[:4096]
+                dialect = sniffer.sniff(sample, delimiters=',;\t|')
+                delimiter = dialect.delimiter
+            except csv.Error:
+                delimiter = ','  # Default to comma
+
+        # Parse CSV
+        reader = csv.reader(io.StringIO(csv_content), delimiter=delimiter)
+        rows = list(reader)
+
+        if not rows:
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": "CSV file is empty"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        # Extract headers
+        headers = rows[0] if has_header else [f"Column_{i+1}" for i in range(len(rows[0]))]
+        data_rows = rows[1:] if has_header else rows
+
+        # Apply preview limit
+        if preview_rows and preview_rows > 0:
+            data_rows = data_rows[:preview_rows]
+
+        # Build result
+        total_rows = len(rows) - (1 if has_header else 0)
+
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": True,
+                "source": source_info,
+                "delimiter": delimiter,
+                "total_rows": total_rows,
+                "total_columns": len(headers),
+                "headers": headers,
+                "preview_rows": len(data_rows),
+                "data": data_rows,
+                "column_info": [{"index": i, "name": h, "sample_values": [row[i] if i < len(row) else "" for row in data_rows[:5]]} for i, h in enumerate(headers)]
+            }, indent=2)}]
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }, indent=2)}],
+            "is_error": True
+        }
+
+
+@tool(
+    name="analyze_csv",
+    description="Analyze CSV data and generate statistics. Provides column types, value distributions, missing values, and basic statistics. Use after parse_csv to understand the data structure.",
+    input_schema={
+        "file_path": str,  # Path to CSV file
+        "delimiter": str  # Optional: delimiter character
+    }
+)
+async def analyze_csv(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Analyze CSV data and generate statistics.
+
+    Args:
+        file_path: Path to CSV file
+        delimiter: CSV delimiter (auto-detected if not provided)
+
+    Returns:
+        Analysis results with statistics per column
+    """
+    import csv
+    import io
+    from collections import Counter
+
+    try:
+        file_path = args.get("file_path", "")
+        delimiter = args.get("delimiter", ",")
+
+        resolved_path = _resolve_path(file_path)
+        if not resolved_path.exists():
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": f"File not found: {resolved_path}"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        with open(resolved_path, 'r', encoding='utf-8-sig') as f:
+            csv_content = f.read()
+
+        # Parse CSV
+        reader = csv.reader(io.StringIO(csv_content), delimiter=delimiter)
+        rows = list(reader)
+
+        if len(rows) < 2:
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": "CSV file has insufficient data for analysis"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        headers = rows[0]
+        data_rows = rows[1:]
+
+        # Analyze each column
+        column_analysis = []
+        for col_idx, header in enumerate(headers):
+            values = [row[col_idx] if col_idx < len(row) else "" for row in data_rows]
+            non_empty = [v for v in values if v.strip()]
+
+            # Detect type
+            numeric_count = 0
+            float_count = 0
+            for v in non_empty:
+                try:
+                    float(v.replace(",", ""))
+                    numeric_count += 1
+                    if "." in v:
+                        float_count += 1
+                except ValueError:
+                    pass
+
+            if numeric_count > len(non_empty) * 0.8:
+                col_type = "float" if float_count > numeric_count * 0.3 else "integer"
+            else:
+                col_type = "string"
+
+            # Calculate stats
+            stats = {
+                "name": header,
+                "index": col_idx,
+                "type": col_type,
+                "total_count": len(values),
+                "non_empty_count": len(non_empty),
+                "empty_count": len(values) - len(non_empty),
+                "unique_count": len(set(non_empty))
+            }
+
+            # Numeric stats
+            if col_type in ["integer", "float"]:
+                try:
+                    numeric_values = [float(v.replace(",", "")) for v in non_empty if v.strip()]
+                    if numeric_values:
+                        stats["min"] = min(numeric_values)
+                        stats["max"] = max(numeric_values)
+                        stats["mean"] = sum(numeric_values) / len(numeric_values)
+                        stats["sum"] = sum(numeric_values)
+                except (ValueError, TypeError):
+                    pass
+
+            # Value distribution (top 5)
+            value_counts = Counter(non_empty)
+            stats["top_values"] = [{"value": v, "count": c} for v, c in value_counts.most_common(5)]
+
+            column_analysis.append(stats)
+
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": True,
+                "file": str(resolved_path),
+                "total_rows": len(data_rows),
+                "total_columns": len(headers),
+                "columns": column_analysis
+            }, indent=2)}]
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }, indent=2)}],
+            "is_error": True
+        }
+
+
+@tool(
+    name="csv_to_spreadsheet",
+    description="Load CSV data directly into the Spreadsheet Builder. This is the PRIMARY tool for displaying CSV data in the UI. The user can then edit and save the data. Use this after parse_csv or directly with a file path.",
+    input_schema={
+        "file_path": str,  # Path to CSV file
+        "name": str,  # Spreadsheet name (default: filename)
+        "delimiter": str,  # Optional: delimiter character
+        "max_rows": int  # Optional: limit rows loaded (default: 1000)
+    }
+)
+async def csv_to_spreadsheet(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Load CSV into the Spreadsheet Builder UI component.
+
+    Args:
+        file_path: Path to CSV file
+        name: Spreadsheet name
+        delimiter: CSV delimiter
+        max_rows: Maximum rows to load
+
+    Returns:
+        Spreadsheet data for UI display
+    """
+    import csv
+    import io
+
+    try:
+        file_path = args.get("file_path", "")
+        name = args.get("name", "")
+        delimiter = args.get("delimiter", ",")
+        max_rows = args.get("max_rows", 1000)
+
+        resolved_path = _resolve_path(file_path)
+        if not resolved_path.exists():
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": f"File not found: {resolved_path}"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        # Default name from filename
+        if not name:
+            name = resolved_path.stem.replace("_", " ").title()
+
+        with open(resolved_path, 'r', encoding='utf-8-sig') as f:
+            csv_content = f.read()
+
+        # Auto-detect delimiter if comma doesn't work well
+        if delimiter == ",":
+            sniffer = csv.Sniffer()
+            try:
+                dialect = sniffer.sniff(csv_content[:4096], delimiters=',;\t|')
+                delimiter = dialect.delimiter
+            except csv.Error:
+                pass
+
+        # Parse CSV
+        reader = csv.reader(io.StringIO(csv_content), delimiter=delimiter)
+        rows = list(reader)
+
+        if not rows:
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": "CSV file is empty"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        # Headers from first row
+        headers = rows[0]
+        data_rows = rows[1:max_rows + 1] if max_rows else rows[1:]
+
+        # Include headers as first row for jspreadsheet (it expects data with header row)
+        full_data = [headers] + data_rows
+
+        # Build column definitions
+        columns = []
+        for i, header in enumerate(headers):
+            # Estimate width based on header and content
+            max_len = len(header)
+            for row in data_rows[:20]:  # Sample first 20 rows
+                if i < len(row):
+                    max_len = max(max_len, len(str(row[i])))
+            width = min(max(80, max_len * 10), 250)  # Between 80 and 250
+            columns.append({"title": header, "width": width})
+
+        total_rows = len(rows) - 1
+        loaded_rows = len(data_rows)
+
+        spreadsheet_data = {
+            "type": "spreadsheet",
+            "name": name,
+            "data": full_data,
+            "columns": columns,
+            "row_count": loaded_rows + 1,  # +1 for header
+            "column_count": len(columns)
+        }
+
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": True,
+                "spreadsheet": spreadsheet_data,
+                "source_file": str(resolved_path),
+                "total_rows_in_file": total_rows,
+                "rows_loaded": loaded_rows,
+                "truncated": total_rows > loaded_rows,
+                "message": f"CSV loaded into Spreadsheet Builder: '{name}' with {loaded_rows} rows. Switch to the Spreadsheet view to see and edit the data."
+            }, indent=2)}]
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }, indent=2)}],
+            "is_error": True
+        }
+
+
+@tool(
+    name="transform_csv",
+    description="Transform CSV data: filter rows, select columns, sort, or aggregate. Returns transformed data ready for spreadsheet display.",
+    input_schema={
+        "file_path": str,  # Path to CSV file
+        "columns": list,  # Optional: columns to include (by name or index)
+        "filter_column": str,  # Optional: column to filter on
+        "filter_value": str,  # Optional: value to filter for
+        "filter_operator": str,  # Optional: "equals", "contains", "greater", "less"
+        "sort_column": str,  # Optional: column to sort by
+        "sort_ascending": bool,  # Optional: sort direction
+        "group_by": str,  # Optional: column to group by
+        "aggregate": str  # Optional: aggregation function ("sum", "count", "avg", "min", "max")
+    }
+)
+async def transform_csv(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Transform CSV data with filtering, sorting, and aggregation.
+
+    Args:
+        file_path: Path to CSV file
+        columns: Columns to include
+        filter_column: Column to filter on
+        filter_value: Value to filter for
+        filter_operator: Filter comparison operator
+        sort_column: Column to sort by
+        sort_ascending: Sort direction
+        group_by: Column to group by for aggregation
+        aggregate: Aggregation function
+
+    Returns:
+        Transformed data ready for spreadsheet
+    """
+    import csv
+    import io
+    from collections import defaultdict
+
+    try:
+        file_path = args.get("file_path", "")
+        select_columns = args.get("columns", None)
+        filter_column = args.get("filter_column", None)
+        filter_value = args.get("filter_value", None)
+        filter_operator = args.get("filter_operator", "equals")
+        sort_column = args.get("sort_column", None)
+        sort_ascending = args.get("sort_ascending", True)
+        group_by = args.get("group_by", None)
+        aggregate = args.get("aggregate", None)
+
+        resolved_path = _resolve_path(file_path)
+        if not resolved_path.exists():
+            return {
+                "content": [{"type": "text", "text": json.dumps({
+                    "success": False,
+                    "error": f"File not found: {resolved_path}"
+                }, indent=2)}],
+                "is_error": True
+            }
+
+        with open(resolved_path, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            headers = reader.fieldnames or []
+            rows = list(reader)
+
+        # Filter rows
+        if filter_column and filter_value is not None and filter_column in headers:
+            filtered_rows = []
+            for row in rows:
+                val = row.get(filter_column, "")
+                try:
+                    if filter_operator == "equals":
+                        if str(val).lower() == str(filter_value).lower():
+                            filtered_rows.append(row)
+                    elif filter_operator == "contains":
+                        if str(filter_value).lower() in str(val).lower():
+                            filtered_rows.append(row)
+                    elif filter_operator == "greater":
+                        if float(val) > float(filter_value):
+                            filtered_rows.append(row)
+                    elif filter_operator == "less":
+                        if float(val) < float(filter_value):
+                            filtered_rows.append(row)
+                except (ValueError, TypeError):
+                    pass
+            rows = filtered_rows
+
+        # Group by and aggregate
+        if group_by and group_by in headers and aggregate:
+            grouped = defaultdict(list)
+            for row in rows:
+                key = row.get(group_by, "")
+                grouped[key].append(row)
+
+            result_rows = []
+            numeric_cols = [h for h in headers if h != group_by]
+
+            for key, group_rows in grouped.items():
+                result_row = {group_by: key}
+                for col in numeric_cols:
+                    try:
+                        values = [float(r.get(col, 0)) for r in group_rows]
+                        if aggregate == "sum":
+                            result_row[col] = sum(values)
+                        elif aggregate == "count":
+                            result_row[col] = len(values)
+                        elif aggregate == "avg":
+                            result_row[col] = sum(values) / len(values) if values else 0
+                        elif aggregate == "min":
+                            result_row[col] = min(values) if values else 0
+                        elif aggregate == "max":
+                            result_row[col] = max(values) if values else 0
+                    except (ValueError, TypeError):
+                        result_row[col] = group_rows[0].get(col, "")
+                result_rows.append(result_row)
+            rows = result_rows
+
+        # Sort
+        if sort_column and sort_column in headers:
+            try:
+                rows.sort(key=lambda r: float(r.get(sort_column, 0)), reverse=not sort_ascending)
+            except (ValueError, TypeError):
+                rows.sort(key=lambda r: str(r.get(sort_column, "")), reverse=not sort_ascending)
+
+        # Select columns
+        if select_columns:
+            # Handle column names or indices
+            selected_headers = []
+            for col in select_columns:
+                if isinstance(col, int) and col < len(headers):
+                    selected_headers.append(headers[col])
+                elif col in headers:
+                    selected_headers.append(col)
+            headers = selected_headers if selected_headers else headers
+
+        # Convert to 2D array for spreadsheet
+        data = [headers]
+        for row in rows:
+            data.append([str(row.get(h, "")) for h in headers])
+
+        columns = [{"title": h, "width": 120} for h in headers]
+
+        spreadsheet_data = {
+            "type": "spreadsheet",
+            "name": f"Transformed: {resolved_path.stem}",
+            "data": data,
+            "columns": columns,
+            "row_count": len(data),
+            "column_count": len(columns)
+        }
+
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": True,
+                "spreadsheet": spreadsheet_data,
+                "original_rows": len(rows),
+                "message": f"Transformed data ready. Switch to Spreadsheet view to see results."
+            }, indent=2)}]
+        }
+
+    except Exception as e:
+        import traceback
+        return {
+            "content": [{"type": "text", "text": json.dumps({
+                "success": False,
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }, indent=2)}],
+            "is_error": True
+        }
+
+
 def _get_workflow_recommendation(stages: dict, files: dict) -> str:
     """Generate a recommendation for the next workflow step."""
     if stages.get("report", {}).get("status") == "complete":
@@ -1424,13 +2133,14 @@ def _get_workflow_recommendation(stages: dict, files: dict) -> str:
 
 def create_ifc_tools_server():
     """
-    Create MCP server with all IFC analysis tools.
+    Create MCP server with all IFC analysis and CSV tools.
 
     Tools become available as:
     - mcp__ifc__parse_ifc_file
     - mcp__ifc__prepare_batches
     - mcp__ifc__calculate_co2
-    - mcp__ifc__generate_excel_report
+    - mcp__ifc__generate_spreadsheet (PREFERRED for tabular data)
+    - mcp__ifc__generate_excel_report (only for explicit download requests)
     - mcp__ifc__generate_pdf_report
     - mcp__ifc__generate_presentation
     - mcp__ifc__check_workflow_stage
@@ -1438,6 +2148,10 @@ def create_ifc_tools_server():
     - mcp__ifc__wait_for_batch_file
     - mcp__ifc__aggregate_batch_results
     - mcp__ifc__get_workflow_status
+    - mcp__ifc__parse_csv (CSV Agent)
+    - mcp__ifc__analyze_csv (CSV Agent)
+    - mcp__ifc__csv_to_spreadsheet (CSV Agent - PRIMARY for loading CSV to UI)
+    - mcp__ifc__transform_csv (CSV Agent)
     """
     return create_sdk_mcp_server(
         name="ifc",
@@ -1446,6 +2160,7 @@ def create_ifc_tools_server():
             parse_ifc_file,
             prepare_batches,
             calculate_co2,
+            generate_spreadsheet,  # PREFERRED for tabular data - must come before generate_excel_report
             generate_excel_report,
             generate_pdf_report,
             generate_presentation,
@@ -1453,7 +2168,12 @@ def create_ifc_tools_server():
             mark_stage_complete,
             wait_for_batch_file,
             aggregate_batch_results,
-            get_workflow_status
+            get_workflow_status,
+            # CSV Agent tools
+            parse_csv,
+            analyze_csv,
+            csv_to_spreadsheet,
+            transform_csv
         ]
     )
 

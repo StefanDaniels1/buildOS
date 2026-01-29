@@ -622,6 +622,91 @@ const server = Bun.serve({
     if (url.pathname === '/api/tools/templates' && req.method === 'GET') {
       const templates = [
         {
+          name: 'csv_processor',
+          description: 'Process CSV data from URL or context - fetch, parse, analyze, and display in spreadsheet',
+          input_schema: { source: 'str', url: 'str', file_path: 'str', operation: 'str' },
+          handler_code: `async def csv_processor(args: dict) -> dict:
+    """
+    Process CSV data from various sources.
+
+    Args:
+        source: "url", "file_path", or "inline"
+        url: URL to fetch CSV from (when source="url")
+        file_path: Path to CSV file (when source="file_path")
+        operation: "parse", "analyze", or "display"
+
+    Returns:
+        Processed CSV data ready for spreadsheet display
+    """
+    import csv
+    import io
+    from collections import Counter
+
+    source = args.get("source", "file_path")
+    operation = args.get("operation", "display")
+
+    # Get CSV content
+    csv_content = ""
+    if source == "url":
+        import httpx
+        url = args.get("url")
+        if not url:
+            return {"success": False, "error": "url is required"}
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, timeout=30.0)
+            csv_content = response.text
+    elif source == "file_path":
+        file_path = args.get("file_path")
+        if not file_path:
+            return {"success": False, "error": "file_path is required"}
+        with open(file_path, 'r', encoding='utf-8-sig') as f:
+            csv_content = f.read()
+    else:
+        return {"success": False, "error": f"Invalid source: {source}"}
+
+    # Parse CSV
+    reader = csv.reader(io.StringIO(csv_content))
+    rows = list(reader)
+
+    if not rows:
+        return {"success": False, "error": "CSV is empty"}
+
+    headers = rows[0]
+    data_rows = rows[1:]
+
+    if operation == "analyze":
+        # Analyze columns
+        analysis = []
+        for i, header in enumerate(headers):
+            values = [row[i] if i < len(row) else "" for row in data_rows]
+            non_empty = [v for v in values if v.strip()]
+            analysis.append({
+                "column": header,
+                "total": len(values),
+                "non_empty": len(non_empty),
+                "unique": len(set(non_empty)),
+                "top_values": [{"value": v, "count": c} for v, c in Counter(non_empty).most_common(5)]
+            })
+        return {"success": True, "analysis": analysis, "row_count": len(data_rows)}
+
+    # Default: display in spreadsheet format
+    columns = [{"title": h, "width": 120} for h in headers]
+
+    return {
+        "success": True,
+        "spreadsheet": {
+            "type": "spreadsheet",
+            "name": "CSV Data",
+            "data": rows,
+            "columns": columns,
+            "row_count": len(rows),
+            "column_count": len(columns)
+        },
+        "message": "Switch to Spreadsheet view to see data"
+    }`,
+          env_vars: {}
+        },
+        {
           name: 'http_request',
           description: 'Make HTTP requests to any API',
           input_schema: { url: 'str', method: 'str', headers: 'dict', body: 'dict' },
@@ -714,6 +799,143 @@ const server = Bun.serve({
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // ==================== SPREADSHEET API ====================
+
+    // POST /api/spreadsheet/save - Save spreadsheet data to session context
+    if (url.pathname === '/api/spreadsheet/save' && req.method === 'POST') {
+      try {
+        const body = await req.json();
+        const { session_id, spreadsheet } = body;
+
+        if (!session_id || !spreadsheet) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'session_id and spreadsheet are required'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Find workspace directory
+        let workspaceDir = process.cwd();
+        if (workspaceDir.includes('/apps/server')) {
+          workspaceDir = workspaceDir.replace('/apps/server', '') + '/workspace';
+        } else if (workspaceDir.includes('/apps')) {
+          workspaceDir = workspaceDir.replace('/apps', '') + '/workspace';
+        } else {
+          workspaceDir = workspaceDir + '/workspace';
+        }
+
+        // Extract user_id from session_id if present, or use a shared folder
+        // Session format: session_timestamp_random or just session_xxx
+        const sessionPart = session_id.split('_').slice(1, 3).join('_');
+        const spreadsheetDir = `${workspaceDir}/.context/spreadsheets`;
+
+        // Ensure directory exists
+        await Bun.write(`${spreadsheetDir}/.gitkeep`, '');
+
+        // Save spreadsheet as JSON
+        const filename = `${session_id}_${spreadsheet.name?.replace(/[^a-zA-Z0-9_-]/g, '_') || 'spreadsheet'}.json`;
+        const filepath = `${spreadsheetDir}/${filename}`;
+
+        await Bun.write(filepath, JSON.stringify({
+          ...spreadsheet,
+          session_id,
+          saved_at: new Date().toISOString()
+        }, null, 2));
+
+        console.log(`Spreadsheet saved: ${filepath}`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          filepath: filepath,
+          message: 'Spreadsheet saved successfully'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error saving spreadsheet:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to save spreadsheet'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // GET /api/spreadsheet/load - Load spreadsheet data for a session
+    if (url.pathname === '/api/spreadsheet/load' && req.method === 'GET') {
+      try {
+        const session_id = url.searchParams.get('session_id');
+
+        if (!session_id) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'session_id is required'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Find workspace directory
+        let workspaceDir = process.cwd();
+        if (workspaceDir.includes('/apps/server')) {
+          workspaceDir = workspaceDir.replace('/apps/server', '') + '/workspace';
+        } else if (workspaceDir.includes('/apps')) {
+          workspaceDir = workspaceDir.replace('/apps', '') + '/workspace';
+        } else {
+          workspaceDir = workspaceDir + '/workspace';
+        }
+
+        const spreadsheetDir = `${workspaceDir}/.context/spreadsheets`;
+
+        // Find spreadsheet files for this session
+        const proc = Bun.spawn(['ls', spreadsheetDir], { stdout: 'pipe', stderr: 'pipe' });
+        const output = await new Response(proc.stdout).text();
+        const files = output.split('\n').filter(f => f.startsWith(session_id) && f.endsWith('.json'));
+
+        if (files.length === 0) {
+          return new Response(JSON.stringify({
+            success: true,
+            spreadsheets: []
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Load all spreadsheets for this session
+        const spreadsheets = [];
+        for (const filename of files) {
+          const filepath = `${spreadsheetDir}/${filename}`;
+          const file = Bun.file(filepath);
+          if (await file.exists()) {
+            const content = await file.json();
+            spreadsheets.push(content);
+          }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          spreadsheets
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Error loading spreadsheets:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Failed to load spreadsheets'
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // ==================== STATIC FILES (uploads) ====================
