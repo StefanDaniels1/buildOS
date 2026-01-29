@@ -76,7 +76,7 @@ defineProps<{
                     <circle cx="4" cy="4" r="2"/>
                   </svg>
                 </div>
-                <a href="https://linkedin.com" target="_blank" rel="noopener">LinkedIn</a>
+                <a href="https://www.linkedin.com/company/bim-ai/" target="_blank" rel="noopener">LinkedIn</a>
               </div>
             </div>
             <a href="mailto:stefan@bimai.nl" class="btn btn-primary">

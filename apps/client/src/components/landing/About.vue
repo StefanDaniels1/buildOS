@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import aboutVideo from '../../landing-matrix.mp4'
+
 defineProps<{
   translations: {
     sectionLabel: string
@@ -21,17 +23,14 @@ defineProps<{
         <!-- Image Side -->
         <div class="about-image">
           <div class="image-wrapper">
-            <!-- Placeholder for image -->
-            <div class="image-placeholder">
-              <div class="placeholder-content">
-                <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                <span>About Image</span>
-              </div>
-            </div>
+            <video
+              class="about-video"
+              autoplay
+              loop
+              muted
+              playsinline
+              :src="aboutVideo"
+            />
 
             <!-- Decorative Elements -->
             <div class="image-decoration decoration-1"></div>
@@ -110,28 +109,11 @@ defineProps<{
   overflow: visible;
 }
 
-.image-placeholder {
+.about-video {
   width: 100%;
-  aspect-ratio: 4/5;
-  background: var(--bg-gradient);
+  height: auto;
   border-radius: var(--radius-2xl);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed var(--border-color);
-}
-
-.placeholder-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--spacing-md);
-  color: var(--text-muted);
-}
-
-.placeholder-icon {
-  width: 48px;
-  height: 48px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 }
 
 /* Image Decorations */
